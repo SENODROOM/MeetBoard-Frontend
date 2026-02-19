@@ -195,9 +195,9 @@ export function useWebRTC(roomId: string, token: string) {
     const startScreenShare = async () => {
         try {
             const screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { cursor: 'always' },
+                video: { cursor: 'always' } as MediaTrackConstraints,
                 audio: false,
-            });
+            } as DisplayMediaStreamOptions);
 
             screenStreamRef.current = screenStream;
             const videoTrack = screenStream.getVideoTracks()[0];
