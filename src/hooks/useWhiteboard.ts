@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+
+// @ts-ignore - fabric.js doesn't have proper TypeScript definitions
 import { fabric } from 'fabric';
 
 export function useWhiteboard(roomId: string, token: string, canvasRef: React.RefObject<HTMLCanvasElement>) {
