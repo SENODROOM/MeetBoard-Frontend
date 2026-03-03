@@ -204,3 +204,23 @@
   font-family: var(--font-mono);
   margin-left: auto;
 }
+
+/* Manual trigger button shown inside room */
+.pipTriggerBtn {
+  position: fixed;
+  bottom: 90px;
+  right: 20px;
+  padding: 8px 14px;
+  background: rgba(0,212,255,0.12);
+  border: 1px solid rgba(0,212,255,0.35);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  z-index: 500;
+  transition: background 0.2s;
+  animation: pipSlideIn 0.3s ease;
+}
+.pipTriggerBtn:hover { background: rgba(0,212,255,0.25); }
+@keyframes pipSlideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }

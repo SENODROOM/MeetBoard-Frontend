@@ -139,3 +139,126 @@
 
 .pinnedSidebar::-webkit-scrollbar { width: 4px; }
 .pinnedSidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Wait / Knock screen ── */
+.waitScreen {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+.waitCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 48px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  max-width: 400px;
+  box-shadow: 0 0 60px rgba(0,0,0,0.5);
+}
+.waitCard h2 { font-size: 22px; font-weight: 700; }
+.waitCard p  { color: var(--text-muted); font-size: 14px; }
+.waitSpinner {
+  width: 48px; height: 48px;
+  border: 3px solid rgba(0,212,255,0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.waitRoom {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  background: rgba(0,212,255,0.06);
+  border: 1px solid rgba(0,212,255,0.2);
+  padding: 6px 14px;
+  border-radius: 6px;
+}
+.waitLeave {
+  padding: 10px 28px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.waitLeave:hover { border-color: var(--red); color: var(--red); }
+
+/* ── Room type pills ── */
+.privatePill {
+  padding: 3px 10px;
+  background: rgba(124,58,237,0.1);
+  border: 1px solid rgba(124,58,237,0.3);
+  color: #a78bfa;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  border-radius: 5px;
+}
+.publicPill {
+  padding: 3px 10px;
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.2);
+  color: var(--accent);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  border-radius: 5px;
+}
+
+/* ── Knock requests (host) ── */
+.knockPanel {
+  position: fixed;
+  top: 70px;
+  right: 16px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 320px;
+}
+.knockItem {
+  background: var(--surface);
+  border: 1px solid rgba(0,212,255,0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  animation: knockIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  font-size: 13px;
+}
+@keyframes knockIn { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
+.knockBtns { display: flex; gap: 6px; }
+.admitBtn {
+  padding: 5px 12px;
+  background: rgba(16,185,129,0.15);
+  border: 1px solid rgba(16,185,129,0.4);
+  color: var(--accent3);
+  font-size: 12px;
+  font-family: var(--font-display);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.admitBtn:hover { background: rgba(16,185,129,0.25); }
+.rejectBtn {
+  padding: 5px 12px;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: var(--red);
+  font-size: 12px;
+  font-family: var(--font-display);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.rejectBtn:hover { background: rgba(239,68,68,0.2); }
