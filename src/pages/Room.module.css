@@ -102,12 +102,13 @@
   gap: 8px;
   padding: 12px;
   overflow: hidden;
+  min-height: 0;
 }
 
-.grid1 { grid-template-columns: 1fr; }
-.grid2 { grid-template-columns: 1fr 1fr; }
+.grid1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.grid2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
 .grid4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-.gridMany { grid-template-columns: repeat(3, 1fr); }
+.gridMany { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; }
 
 /* Pinned layout: big tile + right sidebar */
 .pinnedLayout {

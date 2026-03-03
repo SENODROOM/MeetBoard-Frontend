@@ -31,18 +31,31 @@ export default function Room() {
   const [copied, setCopied] = useState(false);
   const [pinnedId, setPinnedId] = useState(null);
 
-  // PiP: show when tab is hidden
+  // PiP: show when tab is hidden (visibilitychange)
   const [tabHidden, setTabHidden] = useState(false);
   const [pipDismissed, setPipDismissed] = useState(false);
 
   useEffect(() => {
     const onVisibilityChange = () => {
-      const hidden = document.visibilityState === 'hidden';
-      setTabHidden(hidden);
-      if (!hidden) setPipDismissed(false); // restore PiP next time tab hides
+      if (document.visibilityState === 'hidden') {
+        setTabHidden(true);
+        setPipDismissed(false); // reset dismiss each time tab hides
+      } else {
+        setTabHidden(false);
+      }
     };
+    // Also handle window blur/focus as fallback for tab switches
+    const onBlur = () => { setTabHidden(true); setPipDismissed(false); };
+    const onFocus = () => { setTabHidden(false); };
+
     document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const showPip = tabHidden && !pipDismissed;
@@ -225,19 +238,20 @@ export default function Room() {
         />
       )}
 
-      {showPip && (
-        <PipWindow
-          localStream={localStream}
-          peers={peers}
-          pinnedId={pinnedId}
-          localUserName={userName}
-          audioEnabled={audioEnabled}
-          videoEnabled={videoEnabled}
-          onPin={handlePin}
-          onUnpin={() => setPinnedId(null)}
-          onReturnToMeet={() => window.focus()}
-        />
-      )}
+      {/* PiP window — always in DOM, shown/hidden via prop */}
+      <PipWindow
+        visible={showPip}
+        localStream={localStream}
+        peers={peers}
+        pinnedId={pinnedId}
+        localUserName={userName}
+        audioEnabled={audioEnabled}
+        videoEnabled={videoEnabled}
+        onPin={handlePin}
+        onUnpin={() => setPinnedId(null)}
+        onDismiss={() => setPipDismissed(true)}
+        onReturnToMeet={() => { window.focus(); setTabHidden(false); }}
+      />
     </div>
   );
 }
