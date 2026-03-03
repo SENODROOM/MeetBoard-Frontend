@@ -79,6 +79,23 @@
   font-family: var(--font-mono);
 }
 
+/* Unpin all button in topbar */
+.unpinAllBtn {
+  padding: 4px 12px;
+  background: rgba(0,212,255,0.1);
+  border: 1px solid rgba(0,212,255,0.35);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+  animation: popIn 0.2s ease;
+}
+.unpinAllBtn:hover { background: rgba(0,212,255,0.2); }
+@keyframes popIn { from{transform:scale(0.8);opacity:0} to{transform:scale(1);opacity:1} }
+
+/* Normal grid */
 .videoGrid {
   flex: 1;
   display: grid;
@@ -91,3 +108,33 @@
 .grid2 { grid-template-columns: 1fr 1fr; }
 .grid4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
 .gridMany { grid-template-columns: repeat(3, 1fr); }
+
+/* Pinned layout: big tile + right sidebar */
+.pinnedLayout {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  overflow: hidden;
+  animation: fadeIn 0.25s ease;
+}
+@keyframes fadeIn { from{opacity:0;transform:scale(0.98)} to{opacity:1;transform:scale(1)} }
+
+.pinnedMain {
+  flex: 1;
+  min-width: 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.pinnedSidebar {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.pinnedSidebar::-webkit-scrollbar { width: 4px; }
+.pinnedSidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }

@@ -5,6 +5,8 @@ import { useWebRTC } from '../hooks/useWebRTC';
 import VideoTile from '../components/VideoTile';
 import ChatPanel from '../components/ChatPanel';
 import Controls from '../components/Controls';
+import Whiteboard from '../components/Whiteboard';
+import PipWindow from '../components/PipWindow';
 import styles from './Room.module.css';
 
 const SERVER = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
@@ -15,6 +17,7 @@ export default function Room() {
   const socketRef = useRef(null);
   const [socket, setSocket] = useState(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [whiteboardOpen, setWhiteboardOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [unread, setUnread] = useState(0);
   const [userName] = useState(
@@ -25,46 +28,61 @@ export default function Room() {
     if (!id) { id = crypto.randomUUID(); localStorage.setItem('qm_userId', id); }
     return id;
   });
-  const [joined, setJoined] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pinnedId, setPinnedId] = useState(null);
+
+  // PiP: show when tab is hidden
+  const [tabHidden, setTabHidden] = useState(false);
+  const [pipDismissed, setPipDismissed] = useState(false);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      const hidden = document.visibilityState === 'hidden';
+      setTabHidden(hidden);
+      if (!hidden) setPipDismissed(false); // restore PiP next time tab hides
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
+
+  const showPip = tabHidden && !pipDismissed;
+
+  const handlePin = useCallback((socketId) => {
+    setPinnedId((prev) => (prev === socketId ? null : socketId));
+  }, []);
 
   // Init socket
   useEffect(() => {
     const s = io(SERVER, { transports: ['websocket', 'polling'] });
     socketRef.current = s;
     setSocket(s);
-
     s.on('chat-message', (msg) => {
       setMessages((prev) => [...prev, msg]);
       if (!chatOpen) setUnread((u) => u + 1);
     });
-
     return () => { s.disconnect(); };
   }, []);
 
   const {
-    localStream,
-    peers,
-    audioEnabled,
-    videoEnabled,
-    screenSharing,
-    initLocalStream,
-    toggleAudio,
-    toggleVideo,
-    toggleScreenShare,
-    cleanup,
+    localStream, peers, audioEnabled, videoEnabled, screenSharing,
+    initLocalStream, toggleAudio, toggleVideo, toggleScreenShare, cleanup,
   } = useWebRTC({ socket, roomId, userId, userName });
 
-  // Join room after socket + webrtc init
   useEffect(() => {
     if (!socket) return;
     (async () => {
       await initLocalStream();
       socket.emit('join-room', { roomId, userId, userName });
-      setJoined(true);
     })();
     return () => cleanup();
   }, [socket]);
+
+  useEffect(() => {
+    if (pinnedId && pinnedId !== 'local') {
+      const stillPresent = peers.some((p) => p.socketId === pinnedId);
+      if (!stillPresent) setPinnedId(null);
+    }
+  }, [peers, pinnedId]);
 
   const handleLeave = () => {
     cleanup();
@@ -83,24 +101,27 @@ export default function Room() {
     socket.emit('chat-message', { roomId, message: text, userName, userId });
   }, [socket, roomId, userName, userId]);
 
-  const openChat = () => {
-    setChatOpen(true);
-    setUnread(0);
-  };
+  const openChat = () => { setChatOpen(true); setUnread(0); };
 
   const allParticipants = [
     { socketId: 'local', userName, stream: localStream, isLocal: true },
     ...peers.map((p) => ({ ...p, isLocal: false })),
   ];
 
-  const gridClass = allParticipants.length === 1 ? styles.grid1
-    : allParticipants.length === 2 ? styles.grid2
-    : allParticipants.length <= 4 ? styles.grid4
-    : styles.gridMany;
+  const pinnedParticipant = pinnedId ? allParticipants.find((p) => p.socketId === pinnedId) : null;
+  const otherParticipants = pinnedParticipant
+    ? allParticipants.filter((p) => p.socketId !== pinnedId)
+    : allParticipants;
+
+  const gridClass = !pinnedParticipant
+    ? (allParticipants.length === 1 ? styles.grid1
+      : allParticipants.length === 2 ? styles.grid2
+      : allParticipants.length <= 4 ? styles.grid4
+      : styles.gridMany)
+    : null;
 
   return (
     <div className={styles.room}>
-      {/* Top bar */}
       <div className={styles.topbar}>
         <div className={styles.logo}>
           <span className={styles.logoIcon}>⬡</span>
@@ -115,44 +136,106 @@ export default function Room() {
         <div className={styles.topRight}>
           <div className={styles.dot} />
           <span className={styles.participantCount}>{allParticipants.length} in call</span>
+          {pinnedId && (
+            <button className={styles.unpinAllBtn} onClick={() => setPinnedId(null)}>
+              📌 Unpin all
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Video grid */}
-      <div className={`${styles.videoGrid} ${gridClass}`}>
-        {allParticipants.map((p) => (
-          <VideoTile
-            key={p.socketId}
-            stream={p.stream}
-            userName={p.userName}
-            isLocal={p.isLocal}
-            audioEnabled={p.isLocal ? audioEnabled : true}
-            videoEnabled={p.isLocal ? videoEnabled : true}
-          />
-        ))}
-      </div>
+      {pinnedParticipant ? (
+        <div className={styles.pinnedLayout}>
+          <div className={styles.pinnedMain}>
+            <VideoTile
+              stream={pinnedParticipant.stream}
+              userName={pinnedParticipant.userName}
+              isLocal={pinnedParticipant.isLocal}
+              audioEnabled={pinnedParticipant.isLocal ? audioEnabled : true}
+              videoEnabled={pinnedParticipant.isLocal ? videoEnabled : true}
+              isPinned={true}
+              onPin={() => handlePin(pinnedParticipant.socketId)}
+            />
+          </div>
+          {otherParticipants.length > 0 && (
+            <div className={styles.pinnedSidebar}>
+              {otherParticipants.map((p) => (
+                <VideoTile
+                  key={p.socketId}
+                  stream={p.stream}
+                  userName={p.userName}
+                  isLocal={p.isLocal}
+                  audioEnabled={p.isLocal ? audioEnabled : true}
+                  videoEnabled={p.isLocal ? videoEnabled : true}
+                  isPinned={false}
+                  onPin={() => handlePin(p.socketId)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className={`${styles.videoGrid} ${gridClass}`}>
+          {allParticipants.map((p) => (
+            <VideoTile
+              key={p.socketId}
+              stream={p.stream}
+              userName={p.userName}
+              isLocal={p.isLocal}
+              audioEnabled={p.isLocal ? audioEnabled : true}
+              videoEnabled={p.isLocal ? videoEnabled : true}
+              isPinned={pinnedId === p.socketId}
+              onPin={() => handlePin(p.socketId)}
+            />
+          ))}
+        </div>
+      )}
 
-      {/* Controls */}
       <Controls
         audioEnabled={audioEnabled}
         videoEnabled={videoEnabled}
         screenSharing={screenSharing}
         chatOpen={chatOpen}
+        whiteboardOpen={whiteboardOpen}
         unread={unread}
         onToggleAudio={toggleAudio}
         onToggleVideo={toggleVideo}
         onToggleScreen={toggleScreenShare}
         onToggleChat={() => { chatOpen ? setChatOpen(false) : openChat(); }}
+        onToggleWhiteboard={() => setWhiteboardOpen((o) => !o)}
         onLeave={handleLeave}
       />
 
-      {/* Chat panel */}
       {chatOpen && (
         <ChatPanel
           messages={messages}
           userId={userId}
           onSend={sendMessage}
           onClose={() => setChatOpen(false)}
+        />
+      )}
+
+      {whiteboardOpen && socket && (
+        <Whiteboard
+          socket={socket}
+          roomId={roomId}
+          userId={userId}
+          userName={userName}
+          onClose={() => setWhiteboardOpen(false)}
+        />
+      )}
+
+      {showPip && (
+        <PipWindow
+          localStream={localStream}
+          peers={peers}
+          pinnedId={pinnedId}
+          localUserName={userName}
+          audioEnabled={audioEnabled}
+          videoEnabled={videoEnabled}
+          onPin={handlePin}
+          onUnpin={() => setPinnedId(null)}
+          onReturnToMeet={() => window.focus()}
         />
       )}
     </div>

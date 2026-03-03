@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import styles from './VideoTile.module.css';
 
-export default function VideoTile({ stream, userName, isLocal, audioEnabled, videoEnabled }) {
+export default function VideoTile({ stream, userName, isLocal, audioEnabled, videoEnabled, isPinned, onPin }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -17,7 +17,7 @@ export default function VideoTile({ stream, userName, isLocal, audioEnabled, vid
   const hasVideo = stream && stream.getVideoTracks().some((t) => t.enabled && videoEnabled !== false);
 
   return (
-    <div className={styles.tile}>
+    <div className={`${styles.tile} ${isPinned ? styles.pinned : ''}`}>
       <video
         ref={videoRef}
         autoPlay
@@ -25,15 +25,37 @@ export default function VideoTile({ stream, userName, isLocal, audioEnabled, vid
         muted={isLocal}
         className={`${styles.video} ${!hasVideo ? styles.hidden : ''}`}
       />
+
       {!hasVideo && (
         <div className={styles.avatar}>
           <span>{initials}</span>
         </div>
       )}
+
+      {/* Hover overlay with pin button */}
+      <div className={styles.overlay}>
+        <button
+          className={`${styles.pinBtn} ${isPinned ? styles.pinBtnActive : ''}`}
+          onClick={() => onPin && onPin()}
+          title={isPinned ? 'Unpin participant' : 'Pin participant'}
+        >
+          <span className={styles.pinIcon}>📌</span>
+          <span>{isPinned ? 'Unpin' : 'Pin'}</span>
+        </button>
+      </div>
+
+      {/* Pinned corner badge */}
+      {isPinned && (
+        <div className={styles.pinnedBadge} title="Pinned">
+          📌
+        </div>
+      )}
+
       <div className={styles.nameTag}>
         {!audioEnabled && <span className={styles.mutedIcon}>🔇</span>}
         <span>{isLocal ? `${userName} (You)` : userName}</span>
       </div>
+
       {isLocal && <div className={styles.localBadge}>You</div>}
     </div>
   );

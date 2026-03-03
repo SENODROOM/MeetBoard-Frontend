@@ -16,11 +16,13 @@ export default function Controls({
   videoEnabled,
   screenSharing,
   chatOpen,
+  whiteboardOpen,
   unread,
   onToggleAudio,
   onToggleVideo,
   onToggleScreen,
   onToggleChat,
+  onToggleWhiteboard,
   onLeave,
 }) {
   return (
@@ -39,6 +41,11 @@ export default function Controls({
         <Btn onClick={onToggleScreen} active={screenSharing} title="Share Screen">
           🖥️
           <span>{screenSharing ? 'Stop share' : 'Share screen'}</span>
+        </Btn>
+
+        <Btn onClick={onToggleWhiteboard} active={whiteboardOpen} title="Collaborative Whiteboard">
+          🖊️
+          <span>Whiteboard</span>
         </Btn>
 
         <div className={styles.chatWrap}>
