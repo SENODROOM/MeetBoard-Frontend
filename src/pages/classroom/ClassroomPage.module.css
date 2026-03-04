@@ -1,0 +1,206 @@
+/* ── Page ── */
+.page { min-height:100vh; background:var(--bg); }
+.loadPage { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; color:var(--text-muted); }
+.spinner { width:36px; height:36px; border:3px solid rgba(0,212,255,0.2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin{to{transform:rotate(360deg)}}
+.backBtn { padding:7px 16px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:var(--text); font-family:var(--font-display); font-size:13px; border-radius:8px; cursor:pointer; transition:all 0.15s; }
+.backBtn:hover { background:rgba(255,255,255,0.14); }
+
+/* ── Banner ── */
+.banner { padding:32px 32px 28px; color:#000; position:relative; }
+.bannerContent { max-width:1100px; margin:0 auto; display:flex; flex-direction:column; gap:14px; }
+.bannerInfo { flex:1; }
+.bannerTitle { font-size:30px; font-weight:800; font-family:var(--font-display); color:#fff; text-shadow:0 2px 8px rgba(0,0,0,0.4); margin-bottom:4px; }
+.bannerMeta  { font-size:13px; color:rgba(255,255,255,0.75); font-family:var(--font-mono); margin-bottom:4px; }
+.bannerDesc  { font-size:14px; color:rgba(255,255,255,0.8); }
+.bannerActions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.startSessionBtn { padding:11px 22px; background:rgba(0,0,0,0.3); border:2px solid rgba(255,255,255,0.5); color:#fff; font-family:var(--font-display); font-size:13px; font-weight:700; border-radius:10px; cursor:pointer; backdrop-filter:blur(8px); transition:all 0.15s; white-space:nowrap; }
+.startSessionBtn:hover { background:rgba(0,0,0,0.5); border-color:#fff; }
+.inviteBox { display:flex; flex-direction:column; gap:5px; }
+.inviteLabel { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:rgba(255,255,255,0.65); font-family:var(--font-mono); }
+.inviteRow { display:flex; gap:8px; align-items:center; }
+.inviteCode { font-family:var(--font-mono); font-size:20px; font-weight:700; background:rgba(0,0,0,0.3); padding:6px 14px; border-radius:8px; color:#fff; letter-spacing:3px; backdrop-filter:blur(8px); }
+.copyCodeBtn { padding:6px 14px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.4); color:#fff; font-family:var(--font-display); font-size:12px; font-weight:600; border-radius:7px; cursor:pointer; transition:all 0.15s; }
+.copyCodeBtn:hover { background:rgba(255,255,255,0.35); }
+
+/* ── Tabs ── */
+.tabBar { display:flex; gap:0; border-bottom:1px solid var(--border); background:var(--surface); padding:0 24px; overflow-x:auto; }
+.tabBar::-webkit-scrollbar { height:2px; }
+.tab { padding:13px 18px; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-family:var(--font-display); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s; white-space:nowrap; margin-bottom:-1px; }
+.tab:hover { color:var(--text); }
+.tabActive { border-bottom-width:2px !important; }
+
+/* ── Content ── */
+.content { max-width:800px; margin:0 auto; padding:28px 20px 60px; }
+.tabContent { display:flex; flex-direction:column; gap:16px; }
+.emptyTab { display:flex; flex-direction:column; align-items:center; gap:10px; padding:50px; color:var(--text-muted); font-size:14px; }
+.emptyTab span { font-size:40px; opacity:0.4; }
+
+/* ── Compose box ── */
+.composeBox { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; }
+.composePlaceholder { width:100%; background:transparent; border:none; color:var(--text-muted); font-family:var(--font-display); font-size:14px; text-align:left; cursor:pointer; padding:8px 0; }
+.composePlaceholder:hover { color:var(--text); }
+.composeTypeRow { display:flex; gap:8px; margin-bottom:12px; }
+.typeChip { padding:6px 14px; background:transparent; border:1px solid var(--border); color:var(--text-muted); font-family:var(--font-display); font-size:12px; font-weight:600; border-radius:20px; cursor:pointer; transition:all 0.15s; }
+.typeChip:hover { border-color:rgba(255,255,255,0.2); }
+.typeChipActive {}
+.composeText { width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); color:var(--text); font-family:var(--font-display); font-size:14px; border-radius:8px; padding:10px 12px; resize:vertical; outline:none; }
+.composeText:focus { border-color:rgba(0,212,255,0.3); }
+.composeActions { display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
+.composeRight { display:flex; gap:8px; }
+
+/* ── Buttons ── */
+.attachBtn { padding:7px 14px; background:transparent; border:1px solid var(--border); color:var(--text-muted); font-family:var(--font-display); font-size:12px; border-radius:8px; cursor:pointer; transition:all 0.15s; }
+.attachBtn:hover { border-color:rgba(255,255,255,0.25); color:var(--text); }
+.cancelBtn { padding:7px 16px; background:transparent; border:1px solid var(--border); color:var(--text-muted); font-family:var(--font-display); font-size:12px; border-radius:8px; cursor:pointer; }
+.postBtn { padding:8px 20px; font-family:var(--font-display); font-size:13px; font-weight:700; border:none; border-radius:8px; cursor:pointer; transition:all 0.15s; }
+.postBtn:disabled { opacity:0.4; cursor:not-allowed; }
+.postBtn:hover:not(:disabled) { transform:translateY(-1px); }
+.createPostBtn { align-self:flex-start; padding:9px 18px; background:transparent; border:1px dashed; font-family:var(--font-display); font-size:13px; font-weight:600; border-radius:10px; cursor:pointer; transition:all 0.15s; }
+.createPostBtn:hover { opacity:0.8; }
+.backLink { color:var(--text-muted); font-size:13px; background:transparent; border:none; cursor:pointer; padding:0; font-family:var(--font-display); }
+.backLink:hover { color:var(--text); }
+
+/* ── File chips ── */
+.fileRow,.fileChips { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.fileChip { display:flex; align-items:center; gap:6px; padding:4px 10px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:6px; font-size:12px; font-family:var(--font-mono); }
+.fileChip button { background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:11px; padding:0; line-height:1; }
+.fileChip button:hover { color:#ef4444; }
+
+/* ── Create form ── */
+.createForm { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; display:flex; flex-direction:column; gap:12px; }
+.formInput { width:100%; padding:10px 13px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:var(--text); font-family:var(--font-display); font-size:14px; border-radius:9px; outline:none; }
+.formInput:focus { border-color:rgba(0,212,255,0.4); }
+.formTextarea { width:100%; padding:10px 13px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:var(--text); font-family:var(--font-display); font-size:14px; border-radius:9px; outline:none; resize:vertical; }
+.formTextarea:focus { border-color:rgba(0,212,255,0.4); }
+.formRow { display:flex; gap:12px; flex-wrap:wrap; }
+.formGroup { flex:1; min-width:140px; display:flex; flex-direction:column; gap:5px; }
+.formLabel { font-size:10px; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-muted); font-family:var(--font-mono); }
+
+/* ── Post card ── */
+.postCard { background:var(--surface); border:1px solid var(--border); border-left:3px solid; border-radius:12px; padding:18px; }
+.postHeader { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.postAvatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0; }
+.postMeta { flex:1; display:flex; flex-direction:column; }
+.postMeta strong { font-size:13px; font-weight:700; }
+.postTime { font-size:11px; color:var(--text-muted); font-family:var(--font-mono); }
+.postBadge { font-size:11px; font-family:var(--font-mono); font-weight:600; }
+.pinnedBadge { font-size:14px; }
+.postActions { display:flex; gap:4px; margin-left:auto; }
+.postActionBtn { width:28px; height:28px; background:transparent; border:1px solid rgba(255,255,255,0.08); border-radius:6px; cursor:pointer; font-size:13px; transition:all 0.15s; }
+.postActionBtn:hover { background:rgba(255,255,255,0.1); }
+.postTitle { font-size:16px; font-weight:700; margin-bottom:6px; }
+.postBody  { font-size:14px; color:var(--text-muted); line-height:1.6; white-space:pre-wrap; }
+.postFooter { margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05); }
+.commentToggle { background:transparent; border:none; color:var(--text-muted); font-family:var(--font-display); font-size:12px; cursor:pointer; padding:0; }
+.commentToggle:hover { color:var(--text); }
+
+/* ── Attachments ── */
+.attachList { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+.attachItem { display:flex; align-items:center; gap:8px; padding:8px 12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; color:var(--text); font-size:13px; text-decoration:none; transition:all 0.15s; }
+.attachItem:hover { background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.16); }
+.attachName { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.attachSize { font-size:11px; color:var(--text-muted); font-family:var(--font-mono); }
+.attachItem span { font-size:11px; color:var(--text-muted); font-family:var(--font-mono); }
+.dlIcon { color:var(--accent); margin-left:auto; }
+
+/* ── Comments ── */
+.commentSection { margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+.commentRow { display:flex; align-items:flex-start; gap:8px; }
+.commentAvatar { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; flex-shrink:0; }
+.commentContent { flex:1; background:rgba(255,255,255,0.04); border-radius:8px; padding:8px 10px; }
+.commentName { font-size:11px; font-weight:700; display:block; margin-bottom:3px; }
+.commentText { font-size:13px; }
+.commentTime { font-size:10px; color:var(--text-muted); font-family:var(--font-mono); white-space:nowrap; margin-top:3px; }
+.commentInput { display:flex; gap:8px; margin-top:4px; }
+.commentBox { flex:1; padding:8px 12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); color:var(--text); font-family:var(--font-display); font-size:13px; border-radius:8px; outline:none; }
+.commentBox:focus { border-color:rgba(0,212,255,0.35); }
+.commentSend { padding:8px 14px; border:none; border-radius:8px; font-size:14px; cursor:pointer; transition:all 0.15s; }
+.commentSend:disabled { opacity:0.35; cursor:not-allowed; }
+.loadingTxt { font-size:12px; color:var(--text-muted); }
+
+/* ── Assignments ── */
+.assignmentCard { background:var(--surface); border:1px solid var(--border); border-left:3px solid; border-radius:12px; padding:18px; cursor:pointer; transition:all 0.15s; }
+.assignmentCard:hover { border-color:rgba(255,255,255,0.15); transform:translateY(-1px); }
+.assignTop { display:flex; gap:14px; align-items:flex-start; margin-bottom:10px; }
+.assignIcon { font-size:28px; flex-shrink:0; }
+.assignInfo { flex:1; }
+.assignTitle { font-size:16px; font-weight:700; margin-bottom:4px; }
+.assignMeta  { font-size:12px; color:var(--text-muted); font-family:var(--font-mono); display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.assignBody  { font-size:13px; color:var(--text-muted); margin-top:6px; line-height:1.5; }
+.dueChip { padding:2px 8px; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); color:#fca5a5; border-radius:4px; font-size:11px; }
+.ptChip  { padding:2px 8px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); color:#34d399; border-radius:4px; font-size:11px; }
+.assignFooter { margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.05); font-size:12px; font-weight:600; }
+
+/* ── Submission view ── */
+.subHeader { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; }
+.subTitle { font-size:22px; font-weight:800; margin-bottom:8px; }
+.subMeta  { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.subBody  { font-size:14px; color:var(--text-muted); line-height:1.6; }
+.submitBox { background:var(--surface); border:1px solid; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:12px; }
+.submittedState { display:flex; flex-direction:column; gap:8px; }
+.submittedBadge { padding:6px 14px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); color:#34d399; border-radius:7px; font-size:13px; font-weight:600; align-self:flex-start; }
+.subComment { font-size:13px; color:var(--text-muted); font-style:italic; }
+.subFeedback { font-size:13px; color:var(--text-muted); background:rgba(255,255,255,0.04); padding:8px 12px; border-radius:6px; }
+.gradeResult { border:1px solid; border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:6px; }
+.gradeResult strong { font-size:22px; font-family:var(--font-display); }
+.gradeResult p { font-size:13px; color:var(--text-muted); }
+.submissionsSection { display:flex; flex-direction:column; gap:12px; }
+.subsHeading { font-size:16px; font-weight:700; }
+.submissionCard { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; display:flex; flex-direction:column; gap:8px; }
+.subStudentRow { display:flex; align-items:center; gap:10px; }
+.subStudentAvatar { width:34px; height:34px; border-radius:50%; background:rgba(0,212,255,0.15); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0; color:var(--accent); }
+.subTimestamp { font-size:11px; color:var(--text-muted); font-family:var(--font-mono); }
+.subStatusBadge { margin-left:auto; padding:3px 10px; background:rgba(100,116,139,0.15); border:1px solid rgba(100,116,139,0.3); color:var(--text-muted); border-radius:5px; font-size:11px; font-family:var(--font-mono); font-weight:600; }
+.subGraded {}
+.gradeForm { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+.gradeInput { flex:1; min-width:100px; padding:8px 12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:var(--text); font-family:var(--font-display); font-size:13px; border-radius:8px; outline:none; }
+.gradeBtn { align-self:flex-start; padding:6px 14px; background:transparent; border:1px solid; font-family:var(--font-display); font-size:12px; font-weight:600; border-radius:7px; cursor:pointer; transition:all 0.15s; }
+
+/* ── Materials ── */
+.materialCard { background:var(--surface); border:1px solid var(--border); border-left:3px solid; border-radius:12px; padding:18px; }
+.matHeader { display:flex; gap:12px; align-items:flex-start; }
+.matIcon { font-size:28px; flex-shrink:0; }
+.matTitle { font-size:16px; font-weight:700; margin-bottom:3px; }
+.matMeta  { font-size:12px; color:var(--text-muted); font-family:var(--font-mono); margin-bottom:6px; }
+.matBody  { font-size:13px; color:var(--text-muted); line-height:1.5; }
+
+/* ── Members ── */
+.memberSection { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:10px; }
+.memberHeading { font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.memberCount { font-size:12px; padding:1px 7px; background:rgba(255,255,255,0.08); border-radius:4px; color:var(--text-muted); }
+.memberRow { display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+.memberRow:last-of-type { border-bottom:none; }
+.memberAvatar { width:38px; height:38px; border-radius:50%; background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; flex-shrink:0; }
+.memberInfo { flex:1; display:flex; flex-direction:column; }
+.memberName { font-size:14px; font-weight:600; }
+.memberRole { font-size:11px; color:var(--text-muted); font-family:var(--font-mono); }
+.memberEmpty { font-size:13px; color:var(--text-muted); }
+.removeBtn { padding:5px 12px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); color:#fca5a5; font-family:var(--font-display); font-size:11px; font-weight:600; border-radius:6px; cursor:pointer; transition:all 0.15s; }
+.removeBtn:hover { background:rgba(239,68,68,0.18); }
+.inviteBlock { background:var(--surface); border:1px solid; border-radius:12px; padding:24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; }
+.inviteBlock p { color:var(--text-muted); font-size:13px; }
+.bigCode { font-family:var(--font-mono); font-size:36px; font-weight:800; letter-spacing:6px; }
+.copyInviteBtn { padding:10px 24px; border:none; font-family:var(--font-display); font-size:13px; font-weight:700; border-radius:10px; cursor:pointer; transition:all 0.15s; }
+.copyInviteBtn:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,212,255,0.3); }
+
+/* ── Sessions ── */
+.sessionsHeading { font-size:18px; font-weight:700; margin-bottom:4px; }
+.sessionCard { background:var(--surface); border:1px solid var(--border); border-left:3px solid; border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:10px; }
+.sessionTop { display:flex; align-items:center; gap:12px; }
+.sessionDot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.sessionDate { font-size:12px; color:var(--text-muted); font-family:var(--font-mono); margin-left:8px; }
+.livePill { padding:3px 10px; border:1px solid; border-radius:5px; font-size:11px; font-family:var(--font-mono); font-weight:700; margin-left:auto; }
+.sessionMeta { display:flex; gap:16px; font-size:12px; color:var(--text-muted); font-family:var(--font-mono); flex-wrap:wrap; }
+.sessionSummary { font-size:13px; color:var(--text-muted); font-style:italic; }
+.chatLogBlock,.attendeesBlock { font-size:13px; }
+.chatLogBlock summary,.attendeesBlock summary { cursor:pointer; color:var(--text-muted); padding:4px 0; font-family:var(--font-display); font-size:12px; }
+.chatLog { display:flex; flex-direction:column; gap:4px; margin-top:8px; max-height:200px; overflow-y:auto; padding:8px; background:rgba(0,0,0,0.2); border-radius:6px; }
+.chatLogMsg { display:flex; gap:8px; font-size:12px; }
+.chatLogName { color:var(--accent); font-weight:700; white-space:nowrap; }
+.chatLogText { flex:1; color:var(--text-muted); }
+.chatLogTime { color:rgba(100,116,139,0.7); font-family:var(--font-mono); font-size:10px; white-space:nowrap; }
+.attendeeList { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.attendeeChip { padding:3px 10px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:5px; font-size:12px; font-family:var(--font-mono); }
+.rejoinBtn { align-self:flex-start; padding:7px 16px; background:transparent; border:1px solid; font-family:var(--font-display); font-size:12px; font-weight:700; border-radius:8px; cursor:pointer; transition:all 0.15s; }
+.rejoinBtn:hover { opacity:0.8; }
