@@ -1,13 +1,11 @@
 import React, { useRef, useEffect } from 'react';
 import styles from './VideoTile.module.css';
 
-export default function VideoTile({ stream, userName, isLocal, audioEnabled, videoEnabled, isPinned, onPin }) {
+export default function VideoTile({ stream, userName, isLocal, audioEnabled, videoEnabled, isPinned, onPin, isHost, onKick }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-    }
+    if (videoRef.current && stream) videoRef.current.srcObject = stream;
   }, [stream]);
 
   const initials = userName
@@ -18,38 +16,38 @@ export default function VideoTile({ stream, userName, isLocal, audioEnabled, vid
 
   return (
     <div className={`${styles.tile} ${isPinned ? styles.pinned : ''}`}>
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={isLocal}
-        className={`${styles.video} ${!hasVideo ? styles.hidden : ''}`}
-      />
+      <video ref={videoRef} autoPlay playsInline muted={isLocal}
+        className={`${styles.video} ${!hasVideo ? styles.hidden : ''}`} />
 
-      {!hasVideo && (
-        <div className={styles.avatar}>
-          <span>{initials}</span>
-        </div>
-      )}
+      {!hasVideo && <div className={styles.avatar}><span>{initials}</span></div>}
 
-      {/* Hover overlay with pin button */}
+      {/* Hover overlay */}
       <div className={styles.overlay}>
-        <button
-          className={`${styles.pinBtn} ${isPinned ? styles.pinBtnActive : ''}`}
-          onClick={() => onPin && onPin()}
-          title={isPinned ? 'Unpin participant' : 'Pin participant'}
-        >
-          <span className={styles.pinIcon}>📌</span>
-          <span>{isPinned ? 'Unpin' : 'Pin'}</span>
-        </button>
+        <div className={styles.overlayActions}>
+          <button
+            className={`${styles.pinBtn} ${isPinned ? styles.pinBtnActive : ''}`}
+            onClick={() => onPin && onPin()}
+            title={isPinned ? 'Unpin' : 'Pin'}
+          >
+            <span>📌</span>
+            <span>{isPinned ? 'Unpin' : 'Pin'}</span>
+          </button>
+
+          {/* Kick button — only shown to host for remote participants */}
+          {isHost && !isLocal && onKick && (
+            <button
+              className={styles.kickBtn}
+              onClick={(e) => { e.stopPropagation(); onKick(); }}
+              title="Remove from meeting"
+            >
+              <span>🚫</span>
+              <span>Remove</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Pinned corner badge */}
-      {isPinned && (
-        <div className={styles.pinnedBadge} title="Pinned">
-          📌
-        </div>
-      )}
+      {isPinned && <div className={styles.pinnedBadge} title="Pinned">📌</div>}
 
       <div className={styles.nameTag}>
         {!audioEnabled && <span className={styles.mutedIcon}>🔇</span>}

@@ -1,226 +1,216 @@
+/* ══════════════════════════════════════════════════════
+   PipWindow — always in DOM, CSS show/hide only
+   ══════════════════════════════════════════════════════ */
+
 .pip {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 280px;
-  background: #0a0f1a;
-  border: 1px solid rgba(0,212,255,0.25);
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow:
-    0 8px 40px rgba(0,0,0,0.7),
-    0 0 0 1px rgba(0,212,255,0.08),
-    0 0 30px rgba(0,212,255,0.08);
+  bottom: 24px;
+  right: 24px;
+  width: 310px;
   z-index: 9999;
+  background: #07101f;
+  border: 1px solid rgba(0,212,255,0.25);
+  border-radius: 16px;
+  overflow: hidden;
   cursor: grab;
   user-select: none;
-  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s;
+  box-shadow:
+    0 16px 48px rgba(0,0,0,0.8),
+    0 0 0 1px rgba(0,212,255,0.06),
+    0 0 40px rgba(0,212,255,0.08);
+  transition: opacity 0.18s ease, transform 0.2s cubic-bezier(0.22,1,0.36,1);
+}
+.pip:active { cursor: grabbing; }
+.pip:hover {
+  border-color: rgba(0,212,255,0.4);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.85), 0 0 50px rgba(0,212,255,0.1);
 }
 
-/* Visible state */
+/* ── Show / hide ── */
 .pipVisible {
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: all;
 }
-
-/* Hidden state — off-screen, no pointer events */
 .pipHidden {
   opacity: 0;
-  transform: translateY(40px) scale(0.9);
+  transform: translateY(30px) scale(0.93);
   pointer-events: none;
 }
 
-.pip:hover {
-  box-shadow:
-    0 12px 50px rgba(0,0,0,0.8),
-    0 0 0 1px rgba(0,212,255,0.2),
-    0 0 40px rgba(0,212,255,0.12);
-}
-.pip:active { cursor: grabbing; }
-
 /* ── Header ── */
-.pipHeader {
+.header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 10px;
-  background: rgba(0,212,255,0.05);
-  border-bottom: 1px solid rgba(0,212,255,0.1);
+  padding: 8px 12px;
+  background: rgba(0,212,255,0.04);
+  border-bottom: 1px solid rgba(0,212,255,0.09);
+  gap: 8px;
 }
-
-.pipLogo {
+.logo {
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--accent);
-  letter-spacing: 0.3px;
+  flex: 1;
 }
-
+.headerBtns { display: flex; gap: 5px; }
 .returnBtn {
   padding: 3px 10px;
-  background: rgba(0,212,255,0.12);
-  border: 1px solid rgba(0,212,255,0.3);
+  background: rgba(0,212,255,0.1);
+  border: 1px solid rgba(0,212,255,0.28);
   color: var(--accent);
   font-size: 10px;
   font-family: var(--font-mono);
   border-radius: 5px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.15s;
   white-space: nowrap;
 }
-.returnBtn:hover { background: rgba(0,212,255,0.25); }
-
-/* ── Tiles row ── */
-.tilesRow {
-  display: flex;
-  gap: 3px;
-  padding: 3px;
-  background: #050810;
-}
-
-.tile {
-  flex: 1;
-  position: relative;
-  aspect-ratio: 4/3;
-  background: var(--surface);
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid transparent;
-  transition: border-color 0.2s;
-}
-.tile:hover { border-color: rgba(0,212,255,0.3); }
-.tilePinned { border-color: var(--accent) !important; box-shadow: 0 0 10px rgba(0,212,255,0.2); }
-.tileLocal { flex: 0 0 90px; }
-
-.tileEmpty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface);
-  border-radius: 8px;
-  padding: 10px;
-  aspect-ratio: 4/3;
-}
-.tileEmpty span {
-  font-size: 10px;
+.returnBtn:hover { background: rgba(0,212,255,0.22); }
+.closeBtn {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
   color: var(--text-muted);
-  font-family: var(--font-mono);
-  text-align: center;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
 }
+.closeBtn:hover { border-color: #ef4444; color: #ef4444; }
 
+/* ── Main area (16:9 box) ── */
+.mainArea {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #030810;
+  overflow: hidden;
+}
+.emptyMain {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; color: var(--text-muted);
+  font-family: var(--font-mono); font-size: 11px;
+}
+.emptyMain span { font-size: 28px; }
+.emptyMain p { margin: 0; }
+
+/* ── Tile (shared base) ── */
+.tile {
+  position: relative;
+  overflow: hidden;
+  background: #0c1522;
+}
+.tileBig {
+  position: absolute;
+  inset: 0;
+}
+.tileSmall {
+  width: 96px; height: 72px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.tileSmall:hover { border-color: rgba(0,212,255,0.3); }
+.tilePinned { border-color: var(--accent) !important; box-shadow: inset 0 0 0 1px rgba(0,212,255,0.2); }
+
+/* ── Video ── */
 .video {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #050810;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
-.noVideo {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--accent2), var(--accent));
-  font-size: 18px;
-  font-weight: 700;
-  font-family: var(--font-display);
-  color: white;
-}
-
+/* ── Name tag ── */
 .tileLabel {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 3px 5px;
-  background: linear-gradient(transparent, rgba(0,0,0,0.75));
-  font-size: 9px;
-  font-family: var(--font-mono);
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 16px 6px 4px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.82));
+  font-size: 10px; font-family: var(--font-mono); color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none; z-index: 2;
+}
+.pinBadge {
+  position: absolute; top: 5px; left: 5px;
+  font-size: 11px; z-index: 3; pointer-events: none;
 }
 
-/* ── Hover action overlay ── */
-.tileActions {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.55);
-  backdrop-filter: blur(2px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 4px;
-  animation: fadeIn 0.15s ease;
-  z-index: 5;
+/* ── Hover overlay (for tiles + self-corner) ── */
+.hoverOverlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(3px);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 5px; padding: 8px;
+  z-index: 6;
+  animation: fadeIn 0.12s ease;
 }
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-
-.tileActionBtn {
-  width: 100%;
-  padding: 4px 6px;
-  background: rgba(0,0,0,0.7);
-  border: 1px solid rgba(255,255,255,0.2);
-  color: #fff;
-  font-size: 9px;
-  font-family: var(--font-display);
-  font-weight: 600;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
+.overlayBtn {
+  width: 100%; padding: 5px 10px;
+  background: rgba(5,12,24,0.85);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff; font-size: 10px;
+  font-family: var(--font-display); font-weight: 600;
+  border-radius: 6px; cursor: pointer;
+  text-align: center; white-space: nowrap;
+  transition: all 0.14s;
 }
-.tileActionBtn:hover { background: rgba(0,212,255,0.25); border-color: var(--accent); }
-.removeBtn:hover { background: rgba(239,68,68,0.25) !important; border-color: var(--red) !important; color: var(--red) !important; }
+.overlayBtn:hover { background: rgba(0,212,255,0.2); border-color: var(--accent); color: var(--accent); }
+.overlayBtnRed:hover { background: rgba(239,68,68,0.2) !important; border-color: #ef4444 !important; color: #ef4444 !important; }
 
-/* ── Bottom controls ── */
-.pipControls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  background: rgba(0,0,0,0.4);
-  border-top: 1px solid rgba(255,255,255,0.05);
+/* ── Self-view corner (bottom-right of mainArea) ── */
+.selfCorner {
+  position: absolute; bottom: 8px; right: 8px;
+  width: 80px; height: 60px;
+  border-radius: 9px; overflow: hidden;
+  border: 1.5px solid rgba(0,212,255,0.38);
+  background: #0c1522;
+  z-index: 10; cursor: default;
+  box-shadow: 0 2px 14px rgba(0,0,0,0.6);
+  transition: border-color 0.15s;
 }
-
-.pipDot {
-  font-size: 12px;
-  line-height: 1;
+.selfPinned { border-color: var(--accent) !important; }
+.selfLabel {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 10px 4px 2px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  font-size: 8px; font-family: var(--font-mono); color: #fff;
+  white-space: nowrap; overflow: hidden; z-index: 2; pointer-events: none;
 }
-.dotGreen { filter: none; }
-.dotRed { filter: grayscale(1) opacity(0.6); }
-
-.pipPeerCount {
-  font-size: 9px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  margin-left: auto;
+.avatar {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  font-size: 22px; font-weight: 800;
+  font-family: var(--font-display); color: #fff; z-index: 1;
 }
 
-/* Manual trigger button shown inside room */
-.pipTriggerBtn {
-  position: fixed;
-  bottom: 90px;
-  right: 20px;
-  padding: 8px 14px;
-  background: rgba(0,212,255,0.12);
-  border: 1px solid rgba(0,212,255,0.35);
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  z-index: 500;
-  transition: background 0.2s;
-  animation: pipSlideIn 0.3s ease;
+/* ── Strip ── */
+.strip {
+  display: flex; gap: 4px;
+  padding: 5px 6px;
+  background: #050c18;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  overflow-x: auto; scrollbar-width: none;
 }
-.pipTriggerBtn:hover { background: rgba(0,212,255,0.25); }
-@keyframes pipSlideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.strip::-webkit-scrollbar { display: none; }
+
+/* ── Status bar ── */
+.statusBar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 12px;
+  background: rgba(0,0,0,0.3);
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.mediaIcons { display: flex; gap: 6px; font-size: 13px; }
+.count { font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); }

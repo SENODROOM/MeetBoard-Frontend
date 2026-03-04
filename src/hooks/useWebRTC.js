@@ -1,238 +1,215 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const ICE_SERVERS = {
+const ICE = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
   ],
 };
 
 export const useWebRTC = ({ socket, roomId, userId, userName }) => {
-  const localStreamRef = useRef(null);
-  const peersRef = useRef({}); // socketId -> RTCPeerConnection
-  const [peers, setPeers] = useState([]); // [{ socketId, userName, stream }]
-  const [localStream, setLocalStream] = useState(null);
+  const localStreamRef  = useRef(null);
+  const peersRef        = useRef({});
+  const [peers, setPeers]               = useState([]);
+  const [localStream, setLocalStream]   = useState(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [screenSharing, setScreenSharing] = useState(false);
   const screenStreamRef = useRef(null);
 
-  // Init local media
   const initLocalStream = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localStreamRef.current = stream;
-      setLocalStream(stream);
-      return stream;
-    } catch (err) {
-      console.warn('Camera/mic error:', err);
-      // Try audio-only fallback
+      const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStreamRef.current = s;
+      setLocalStream(s);
+      return s;
+    } catch {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-        localStreamRef.current = stream;
-        setLocalStream(stream);
-        return stream;
-      } catch (e) {
-        console.error('No media available');
-        return null;
-      }
+        const s = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+        localStreamRef.current = s;
+        setLocalStream(s);
+        return s;
+      } catch { return null; }
     }
   }, []);
 
-  const createPeerConnection = useCallback((socketId, remoteUserName) => {
-    const pc = new RTCPeerConnection(ICE_SERVERS);
+  const removePeer = useCallback((sid) => {
+    if (peersRef.current[sid]) {
+      peersRef.current[sid].close();
+      delete peersRef.current[sid];
+    }
+    setPeers((p) => p.filter((x) => x.socketId !== sid));
+  }, []);
 
-    // Add local tracks
+  const createPeerConnection = useCallback((sid, remoteUserName) => {
+    if (peersRef.current[sid]) {
+      peersRef.current[sid].close();
+      delete peersRef.current[sid];
+    }
+    const pc = new RTCPeerConnection(ICE);
+
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
-        pc.addTrack(track, localStreamRef.current);
-      });
+      localStreamRef.current.getTracks().forEach((t) => pc.addTrack(t, localStreamRef.current));
     }
 
-    // ICE candidates
     pc.onicecandidate = ({ candidate }) => {
       if (candidate && socket) {
-        socket.emit('ice-candidate', { to: socketId, from: socket.id, candidate });
+        socket.emit('ice-candidate', { to: sid, from: socket.id, candidate });
       }
     };
 
-    // Remote stream
     const remoteStream = new MediaStream();
     pc.ontrack = ({ track }) => {
       remoteStream.addTrack(track);
       setPeers((prev) => {
-        const existing = prev.find((p) => p.socketId === socketId);
-        if (existing) {
-          return prev.map((p) => p.socketId === socketId ? { ...p, stream: remoteStream } : p);
-        }
-        return [...prev, { socketId, userName: remoteUserName, stream: remoteStream }];
+        const ex = prev.find((p) => p.socketId === sid);
+        if (ex) return prev.map((p) => p.socketId === sid ? { ...p, stream: remoteStream } : p);
+        return [...prev, { socketId: sid, userName: remoteUserName, stream: remoteStream }];
       });
     };
 
     pc.onconnectionstatechange = () => {
       if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
-        removePeer(socketId);
+        removePeer(sid);
       }
     };
 
-    peersRef.current[socketId] = pc;
+    peersRef.current[sid] = pc;
     return pc;
-  }, [socket]);
+  }, [socket, removePeer]);
 
-  const removePeer = useCallback((socketId) => {
-    if (peersRef.current[socketId]) {
-      peersRef.current[socketId].close();
-      delete peersRef.current[socketId];
-    }
-    setPeers((prev) => prev.filter((p) => p.socketId !== socketId));
-  }, []);
-
-  // Socket signaling events
   useEffect(() => {
     if (!socket) return;
 
-    const handleExistingPeers = async (peers) => {
-      for (const peer of peers) {
+    const handleExistingPeers = async (existingPeers) => {
+      for (const peer of existingPeers) {
         const pc = createPeerConnection(peer.socketId, peer.userName);
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit('offer', { to: peer.socketId, from: socket.id, offer, userName });
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socket.emit('offer', { to: peer.socketId, from: socket.id, offer, userName });
+        } catch (e) { console.warn('offer error', e); }
       }
     };
 
-    const handleUserJoined = ({ socketId, userName: remoteUserName }) => {
-      // The new user will send us an offer, just register
+    const handleUserJoined = ({ socketId, userName: rName }) => {
       setPeers((prev) => {
-        if (!prev.find((p) => p.socketId === socketId)) {
-          return [...prev, { socketId, userName: remoteUserName, stream: null }];
-        }
-        return prev;
+        if (prev.find((p) => p.socketId === socketId)) return prev;
+        return [...prev, { socketId, userName: rName, stream: null }];
       });
     };
 
-    const handleOffer = async ({ from, offer, userName: remoteUserName }) => {
-      const pc = createPeerConnection(from, remoteUserName);
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      socket.emit('answer', { to: from, from: socket.id, answer });
+    const handleOffer = async ({ from, offer, userName: rName }) => {
+      let pc = peersRef.current[from];
+      if (!pc || pc.signalingState === 'closed') {
+        pc = createPeerConnection(from, rName);
+      }
+      try {
+        if (pc.signalingState !== 'stable') {
+          await pc.setLocalDescription({ type: 'rollback' });
+        }
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit('answer', { to: from, from: socket.id, answer });
+      } catch (e) { console.warn('answer error', e); }
     };
 
     const handleAnswer = async ({ from, answer }) => {
       const pc = peersRef.current[from];
-      if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      if (!pc || pc.signalingState !== 'have-local-offer') return;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch (e) { console.warn('setRemoteDescription error', e); }
     };
 
-    const handleIceCandidate = async ({ from, candidate }) => {
+    const handleIce = async ({ from, candidate }) => {
       const pc = peersRef.current[from];
-      if (pc && candidate) {
-        try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {}
-      }
+      if (!pc || !candidate) return;
+      try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
     };
 
-    const handleUserLeft = ({ socketId }) => removePeer(socketId);
+    const handleUserLeft    = ({ socketId }) => removePeer(socketId);
+    const handleKicked      = () => window.dispatchEvent(new Event('qm-kicked'));
 
-    socket.on('existing-peers', handleExistingPeers);
-    socket.on('user-joined', handleUserJoined);
-    socket.on('offer', handleOffer);
-    socket.on('answer', handleAnswer);
-    socket.on('ice-candidate', handleIceCandidate);
-    socket.on('user-left', handleUserLeft);
+    socket.on('existing-peers',  handleExistingPeers);
+    socket.on('user-joined',     handleUserJoined);
+    socket.on('offer',           handleOffer);
+    socket.on('answer',          handleAnswer);
+    socket.on('ice-candidate',   handleIce);
+    socket.on('user-left',       handleUserLeft);
+    socket.on('kicked',          handleKicked);
 
     return () => {
-      socket.off('existing-peers', handleExistingPeers);
-      socket.off('user-joined', handleUserJoined);
-      socket.off('offer', handleOffer);
-      socket.off('answer', handleAnswer);
-      socket.off('ice-candidate', handleIceCandidate);
-      socket.off('user-left', handleUserLeft);
+      socket.off('existing-peers',  handleExistingPeers);
+      socket.off('user-joined',     handleUserJoined);
+      socket.off('offer',           handleOffer);
+      socket.off('answer',          handleAnswer);
+      socket.off('ice-candidate',   handleIce);
+      socket.off('user-left',       handleUserLeft);
+      socket.off('kicked',          handleKicked);
     };
   }, [socket, createPeerConnection, removePeer, userName]);
 
-  // Toggle audio
   const toggleAudio = useCallback(() => {
     if (!localStreamRef.current) return;
     const enabled = !audioEnabled;
-    localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = enabled));
+    localStreamRef.current.getAudioTracks().forEach((t) => { t.enabled = enabled; });
     setAudioEnabled(enabled);
     if (socket) socket.emit('toggle-audio', { roomId, userId, enabled });
   }, [audioEnabled, socket, roomId, userId]);
 
-  // Toggle video
   const toggleVideo = useCallback(() => {
     if (!localStreamRef.current) return;
     const enabled = !videoEnabled;
-    localStreamRef.current.getVideoTracks().forEach((t) => (t.enabled = enabled));
+    localStreamRef.current.getVideoTracks().forEach((t) => { t.enabled = enabled; });
     setVideoEnabled(enabled);
     if (socket) socket.emit('toggle-video', { roomId, userId, enabled });
   }, [videoEnabled, socket, roomId, userId]);
 
-  // Screen share
   const toggleScreenShare = useCallback(async () => {
     if (screenSharing) {
-      // Stop screen share, restore camera
-      if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach((t) => t.stop());
-        screenStreamRef.current = null;
-      }
-      const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localStreamRef.current = camStream;
-      setLocalStream(camStream);
-      // Replace tracks in all peer connections
-      Object.values(peersRef.current).forEach((pc) => {
-        const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-        if (sender) sender.replaceTrack(camStream.getVideoTracks()[0]);
-      });
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      try {
+        const cam = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localStreamRef.current = cam;
+        setLocalStream(cam);
+        Object.values(peersRef.current).forEach((pc) => {
+          const s = pc.getSenders().find((s) => s.track?.kind === 'video');
+          if (s) s.replaceTrack(cam.getVideoTracks()[0]);
+        });
+      } catch {}
       setScreenSharing(false);
     } else {
       try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        screenStreamRef.current = screenStream;
-        const screenTrack = screenStream.getVideoTracks()[0];
-        // Replace video track in all peers
+        const ss = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        screenStreamRef.current = ss;
+        const track = ss.getVideoTracks()[0];
         Object.values(peersRef.current).forEach((pc) => {
-          const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-          if (sender) sender.replaceTrack(screenTrack);
+          const s = pc.getSenders().find((s) => s.track?.kind === 'video');
+          if (s) s.replaceTrack(track);
         });
-        // Update local stream display
-        const newStream = new MediaStream([
-          screenTrack,
-          ...(localStreamRef.current?.getAudioTracks() || []),
-        ]);
-        setLocalStream(newStream);
-        screenTrack.onended = () => toggleScreenShare();
+        const ns = new MediaStream([track, ...(localStreamRef.current?.getAudioTracks() || [])]);
+        setLocalStream(ns);
+        track.onended = () => toggleScreenShare();
         setScreenSharing(true);
-      } catch (e) {
-        console.error('Screen share failed:', e);
-      }
+      } catch (e) { console.error('Screen share failed:', e); }
     }
   }, [screenSharing]);
 
-  // Cleanup
   const cleanup = useCallback(() => {
     Object.values(peersRef.current).forEach((pc) => pc.close());
     peersRef.current = {};
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((t) => t.stop());
-    }
-    if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach((t) => t.stop());
-    }
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
     setPeers([]);
     setLocalStream(null);
   }, []);
 
   return {
-    localStream,
-    peers,
-    audioEnabled,
-    videoEnabled,
-    screenSharing,
-    initLocalStream,
-    toggleAudio,
-    toggleVideo,
-    toggleScreenShare,
-    cleanup,
+    localStream, peers, audioEnabled, videoEnabled, screenSharing,
+    initLocalStream, toggleAudio, toggleVideo, toggleScreenShare, cleanup,
   };
 };

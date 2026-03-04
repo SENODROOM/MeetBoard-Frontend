@@ -64,7 +64,14 @@
 
 .tile:hover .overlay {
   opacity: 1;
-  background: rgba(0,0,0,0.15);
+  background: rgba(0,0,0,0.18);
+}
+
+.overlayActions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
 }
 
 /* Pin button inside overlay */
@@ -100,6 +107,26 @@
 }
 
 .pinIcon { font-size: 14px; }
+
+/* Kick / Remove button */
+.kickBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: rgba(239,68,68,0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(239,68,68,0.8);
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  white-space: nowrap;
+}
+.kickBtn:hover { background: rgba(239,68,68,0.95); transform: scale(1.05); }
 
 /* Corner badge showing pin status persistently */
 .pinnedBadge {

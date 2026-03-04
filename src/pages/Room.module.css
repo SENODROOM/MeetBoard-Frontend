@@ -262,3 +262,33 @@
   transition: background 0.2s;
 }
 .rejectBtn:hover { background: rgba(239,68,68,0.2); }
+
+.waitLogo { font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--accent); }
+.waitInput {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 15px;
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.waitInput:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,212,255,0.15); }
+.waitError { color: var(--red); font-size: 12px; font-family: var(--font-mono); }
+.waitJoinBtn {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, var(--accent), #0099bb);
+  color: #000;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: var(--font-display);
+  border-radius: 10px;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.waitJoinBtn:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,212,255,0.4); }

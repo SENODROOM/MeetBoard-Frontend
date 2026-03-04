@@ -188,3 +188,68 @@
   white-space: nowrap;
   margin-bottom: 2px;
 }
+
+/* ── Image overlays ─────────────────────────────────────────────────── */
+.imgOverlay {
+  position: absolute;
+  cursor: grab;
+  border: 2px solid transparent;
+  border-radius: 3px;
+  box-sizing: border-box;
+  transition: border-color 0.1s;
+  z-index: 20;
+}
+.imgOverlay:hover { border-color: rgba(0,212,255,0.4); }
+.imgSelected {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px rgba(0,212,255,0.3), 0 4px 20px rgba(0,0,0,0.4);
+}
+.imgOverlay:active { cursor: grabbing; }
+
+/* Resize handle — bottom-right corner */
+.resizeHandle {
+  position: absolute;
+  bottom: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border: 2px solid #fff;
+  border-radius: 3px;
+  cursor: nwse-resize;
+  z-index: 25;
+}
+
+/* Delete (✕) button — top-right of image */
+.imgDeleteBtn {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 22px;
+  height: 22px;
+  background: #ef4444;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 26;
+  line-height: 1;
+  padding: 0;
+  transition: transform 0.1s, background 0.1s;
+}
+.imgDeleteBtn:hover { background: #b91c1c; transform: scale(1.15); }
+
+/* Drag-n-drop hint tip in toolbar */
+.imageTip {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  padding: 0 6px;
+  white-space: nowrap;
+  opacity: 0.7;
+}
