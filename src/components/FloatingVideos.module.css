@@ -1,0 +1,93 @@
+.strip {
+  position: fixed;
+  bottom: 88px;
+  left: 16px;
+  z-index: 250;
+  background: rgba(7,16,31,0.94);
+  border: 1px solid rgba(0,212,255,0.25);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 0 24px rgba(0,212,255,0.07);
+  backdrop-filter: blur(10px);
+  cursor: grab;
+  user-select: none;
+  min-width: 120px;
+  max-width: 90vw;
+  transition: box-shadow 0.2s;
+}
+.strip:active { cursor: grabbing; }
+.strip:hover  { border-color: rgba(0,212,255,0.4); }
+
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(0,212,255,0.05);
+  border-bottom: 1px solid rgba(0,212,255,0.08);
+  gap: 8px;
+}
+.logo { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--accent); }
+.headerRight { display: flex; align-items: center; gap: 6px; }
+.count {
+  font-size: 10px; font-family: var(--font-mono); color: var(--text-muted);
+  background: rgba(0,212,255,0.08); padding: 1px 6px; border-radius: 4px;
+}
+.collapseBtn {
+  background: transparent; border: none; color: var(--text-muted);
+  font-size: 10px; cursor: pointer; padding: 2px 4px;
+  border-radius: 4px; transition: color 0.15s;
+}
+.collapseBtn:hover { color: var(--accent); }
+
+.tiles {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: 600px;
+}
+.tiles::-webkit-scrollbar { display: none; }
+
+.tile {
+  position: relative;
+  width: 100px; height: 75px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0c1522;
+  border: 1px solid rgba(255,255,255,0.07);
+  transition: border-color 0.15s;
+}
+.tile:hover { border-color: rgba(0,212,255,0.3); }
+
+.video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.mirrored { transform: scaleX(-1); }
+
+.avatar {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  font-size: 24px; font-weight: 800;
+  font-family: var(--font-display); color: #fff;
+  z-index: 1;
+}
+
+.nameTag {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 12px 5px 3px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.82));
+  font-size: 9px; font-family: var(--font-mono); color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  z-index: 2; pointer-events: none;
+}
+
+.youBadge {
+  position: absolute; top: 4px; right: 4px;
+  background: var(--accent); color: #000;
+  font-size: 8px; font-weight: 800; font-family: var(--font-mono);
+  padding: 1px 5px; border-radius: 3px; z-index: 3;
+}

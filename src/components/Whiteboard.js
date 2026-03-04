@@ -5,7 +5,7 @@ import styles from './Whiteboard.module.css';
 const COLORS = ['#00d4ff','#ffffff','#f59e0b','#10b981','#ef4444','#a855f7','#f97316','#ec4899'];
 const SIZES  = [2, 4, 8, 14, 22];
 
-export default function Whiteboard({ socket, roomId, userId, userName, onClose }) {
+export default function Whiteboard({ socket, roomId, userId, userName, onClose, wbAllowed = true }) {
   const canvasRef  = useRef(null);
   const drawing    = useRef(false);
   const lastPos    = useRef(null);
@@ -145,6 +145,7 @@ export default function Whiteboard({ socket, roomId, userId, userName, onClose }
 
   // ── drawing ─────────────────────────────────────────────────────────────────
   const startDraw = useCallback((e) => {
+    if (!wbAllowed) return;
     e.preventDefault();
     drawing.current = true;
     lastPos.current = getPos(e);
@@ -433,6 +434,7 @@ export default function Whiteboard({ socket, roomId, userId, userName, onClose }
         {/* Canvas area */}
         <div
           className={styles.canvasWrap}
+          style={!wbAllowed ? { cursor: 'not-allowed' } : {}}
           onMouseMove={handleWrapMouseMove}
           onMouseUp={handleWrapMouseUp}
           onMouseLeave={handleWrapMouseUp}
@@ -451,6 +453,12 @@ export default function Whiteboard({ socket, roomId, userId, userName, onClose }
             onTouchMove={draw}
             onTouchEnd={stopDraw}
           />
+
+          {!wbAllowed && (
+            <div className={styles.wbLocked}>
+              🔒 The host has disabled your drawing access
+            </div>
+          )}
 
           {/* ── Draggable image overlays ── */}
           {images.map(({ id, src, x, y, w, h }) => (

@@ -1,68 +1,58 @@
 .bar {
   display: flex;
   justify-content: center;
-  padding: 14px 20px;
+  padding: 12px 20px;
   background: var(--surface);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
-
 .controls {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
 }
-
 .btn {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 10px 18px;
+  gap: 3px;
+  padding: 9px 14px;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 12px;
   color: var(--text);
   font-family: var(--font-display);
-  font-size: 10px;
   cursor: pointer;
   transition: all 0.2s;
-  min-width: 68px;
+  min-width: 62px;
 }
-.btn > :first-child { font-size: 22px; }
-.btn:hover { border-color: var(--accent); background: rgba(0,212,255,0.05); }
-
+.icon { font-size: 20px; line-height: 1; }
+.label { font-size: 9px; font-weight: 600; white-space: nowrap; letter-spacing: 0.2px; }
+.btn:hover { border-color: var(--accent); background: rgba(0,212,255,0.06); }
 .active {
   background: rgba(239,68,68,0.1);
   border-color: var(--red);
   color: var(--red);
 }
-
 .danger {
   background: var(--red);
   border-color: var(--red);
   color: white;
 }
-.danger:hover {
-  background: #dc2626;
-  border-color: #dc2626;
-}
-
-.chatWrap { position: relative; }
-
+.danger:hover { background: #dc2626; border-color: #dc2626; }
 .badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: -5px; right: -5px;
   background: var(--accent);
   color: #000;
-  font-size: 10px;
-  font-weight: 700;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 9px; font-weight: 800;
+  min-width: 17px; height: 17px;
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
   font-family: var(--font-mono);
+  padding: 0 3px;
+  pointer-events: none;
 }
