@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { useWebRTC } from '../hooks/useWebRTC';
 import VideoTile from '../components/VideoTile';
@@ -17,32 +17,6 @@ const API = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
 export default function Room() {
   const { roomId } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const classroomId = new URLSearchParams(location.search).get('classroom');
-  const sessionIdRef = useRef(null);
-
-  // ── Track classroom session ───────────────────────────────────────────────
-  useEffect(() => {
-    if (!classroomId || !isHost || !nameConfirmed) return;
-    // Session was already created on server by ClassroomPage; find it or create
-    const roomIdParam = roomId;
-    fetch(`${API}/api/classrooms/${classroomId}/sessions`)
-      .then(r => r.json())
-      .then(sessions => {
-        const active = Array.isArray(sessions) && sessions.find(s => s.roomId === roomIdParam && !s.endedAt);
-        if (active) sessionIdRef.current = active._id;
-      }).catch(() => {});
-  }, [classroomId, isHost, nameConfirmed]);
-
-  // ── Save chat + attendees to session on leave ─────────────────────────────
-  const saveSessionData = useCallback(async () => {
-    if (!classroomId || !sessionIdRef.current) return;
-    const chatPayload = messages.map(m => ({ userName: m.userName, message: m.message, timestamp: m.timestamp }));
-    await fetch(`${API}/api/classrooms/${classroomId}/sessions/${sessionIdRef.current}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endedAt: new Date().toISOString(), chatLog: chatPayload }),
-    }).catch(() => {});
-  }, [classroomId, messages]);
 
   // ── Identity ─────────────────────────────────────────────────────────────────
   const [userName, setUserName] = useState(() => localStorage.getItem('qm_userName') || '');
@@ -218,8 +192,7 @@ export default function Room() {
       setPinnedId(null);
   }, [peers, pinnedId]);
 
-  const handleLeave = async () => {
-    await saveSessionData();
+  const handleLeave = () => {
     cleanup(); socketRef.current?.disconnect();
     localStorage.removeItem(`qm_host_${roomId}`);
     navigate('/');

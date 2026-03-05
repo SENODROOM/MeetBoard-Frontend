@@ -115,10 +115,6 @@ export default function Home() {
             className={`${styles.navTab} ${tab === 'live' ? styles.navTabActive : ''}`}
             onClick={() => setTab('live')}
           >🔴 Live Streams</button>
-          <button
-            className={styles.navTab}
-            onClick={() => navigate('/classrooms')}
-          >🎓 Classrooms</button>
         </div>
       </nav>
 
