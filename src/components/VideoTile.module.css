@@ -1,186 +1,94 @@
 .tile {
   position: relative;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  background: var(--surface2);
+  border-radius: 14px;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  min-width: 0;
-  width: 100%;
-  height: 100%;
-  transition: border-color 0.3s, box-shadow 0.3s;
+  width: 100%; height: 100%;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  contain: layout paint;
 }
 
-.tile:hover { border-color: rgba(0,212,255,0.3); }
+.pinned { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,212,255,0.2), var(--glow); }
 
-/* Pinned tile gets accent border + glow */
-.pinned {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px rgba(0,212,255,0.25), 0 0 24px rgba(0,212,255,0.15);
+.speaking {
+  border-color: var(--accent3);
+  box-shadow: 0 0 0 2px rgba(16,185,129,0.3), 0 0 20px rgba(16,185,129,calc(var(--vol,0) * 0.4));
 }
 
-.video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #050810;
-  transform: scaleX(-1);
+.speakRing {
+  position: absolute; inset: -4px;
+  border-radius: 17px;
+  border: 3px solid var(--accent3);
+  pointer-events: none;
+  transition: opacity 0.1s;
 }
 
-.hidden { display: none; }
+.video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
 
 .avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent2), var(--accent));
-  font-size: 28px;
-  font-weight: 700;
-  color: white;
-  font-family: var(--font-display);
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 40% 35%,
+    hsl(calc(var(--hue, 200) + 40), 60%, 25%),
+    hsl(var(--hue, 200), 50%, 12%));
 }
-
-/* Hover overlay — invisible until hovered */
-.overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0);
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding: 10px;
-  opacity: 0;
-  transition: opacity 0.2s, background 0.2s;
-  z-index: 5;
-}
-
-.tile:hover .overlay {
-  opacity: 1;
-  background: rgba(0,0,0,0.18);
-}
-
-.overlayActions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-end;
-}
-
-/* Pin button inside overlay */
-.pinBtn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  background: rgba(0,0,0,0.65);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 8px;
-  color: #fff;
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, transform 0.15s;
-  white-space: nowrap;
-}
-
-.pinBtn:hover {
-  background: rgba(0,212,255,0.25);
-  border-color: var(--accent);
-  transform: scale(1.05);
-}
-
-/* When already pinned — button shows "Unpin" style */
-.pinBtnActive {
-  background: rgba(0,212,255,0.2);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.pinIcon { font-size: 14px; }
-
-/* Kick / Remove button */
-.kickBtn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  background: rgba(239,68,68,0.7);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(239,68,68,0.8);
-  border-radius: 8px;
-  color: #fff;
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
-  white-space: nowrap;
-}
-.kickBtn:hover { background: rgba(239,68,68,0.95); transform: scale(1.05); }
-
-/* Corner badge showing pin status persistently */
-.pinnedBadge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: rgba(0,212,255,0.2);
-  border: 1px solid var(--accent);
-  font-size: 13px;
-  padding: 3px 7px;
-  border-radius: 6px;
-  z-index: 6;
-  backdrop-filter: blur(6px);
-  animation: popIn 0.2s ease;
-}
-
-@keyframes popIn {
-  from { transform: scale(0.6); opacity: 0; }
-  to   { transform: scale(1);   opacity: 1; }
+.avatar span {
+  font-size: clamp(24px, 6vw, 52px);
+  font-weight: 800;
+  color: hsl(var(--hue, 200), 80%, 75%);
+  letter-spacing: -1px;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
 }
 
 .nameTag {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  background: rgba(0,0,0,0.6);
+  position: absolute; bottom: 10px; left: 10px;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(4,8,16,0.72);
   backdrop-filter: blur(8px);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 12px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  padding: 4px 9px;
+  max-width: calc(100% - 20px);
+  transition: all 0.15s;
+}
+.name { font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muteIcon { font-size: 11px; }
+.youPill {
+  font-size: 9px; font-weight: 700;
+  background: rgba(0,212,255,0.15);
+  border: 1px solid rgba(0,212,255,0.3);
+  color: var(--accent);
+  border-radius: 4px; padding: 1px 5px;
   font-family: var(--font-mono);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 80%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  z-index: 4;
+  text-transform: uppercase; letter-spacing: 0.5px;
 }
 
-.mutedIcon { font-size: 12px; }
-
-.localBadge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: var(--accent);
-  color: #000;
-  font-size: 10px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  padding: 2px 8px;
-  border-radius: 4px;
-  letter-spacing: 1px;
-  z-index: 6;
+.pinBadge {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(0,212,255,0.15);
+  border: 1px solid rgba(0,212,255,0.3);
+  border-radius: 6px; padding: 3px 6px; font-size: 12px;
 }
+
+.overlay {
+  position: absolute; inset: 0;
+  background: rgba(4,8,16,0.6);
+  backdrop-filter: blur(2px);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+  animation: fadeIn 0.12s ease;
+}
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+.overlayBtn {
+  padding: 8px 18px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: var(--text);
+  font-size: 13px; font-weight: 600;
+  border-radius: 9px;
+  transition: all 0.15s;
+}
+.overlayBtn:hover { background: rgba(0,212,255,0.18); border-color: var(--accent); color: var(--accent); }
+.kickBtn:hover { background: rgba(239,68,68,0.18) !important; border-color: var(--red) !important; color: var(--red) !important; }
