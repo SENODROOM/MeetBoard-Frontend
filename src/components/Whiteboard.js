@@ -428,7 +428,7 @@ export default function Whiteboard({ socket, roomId, userId, userName, onClose, 
             ))}
           </div>
 
-          <div className={styles.imageTip}>💡 Drag &amp; drop · Ctrl+V paste</div>
+          <div className={styles.imageTip}>💡 Drag & drop · Ctrl+V paste</div>
         </div>
 
         {/* Canvas area */}

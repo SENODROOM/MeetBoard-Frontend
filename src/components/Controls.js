@@ -25,9 +25,12 @@ export default function Controls({
   audioEnabled, videoEnabled, screenSharing,
   chatOpen, whiteboardOpen, unread,
   handRaised, isHost, recording,
+  transcribeOpen, breakoutOpen, pollOpen, qnaOpen,
+  pollBadge, qnaBadge,
   onToggleAudio, onToggleVideo, onToggleScreen,
   onToggleChat, onToggleWhiteboard,
   onRaiseHand, onOpenSettings, onReaction, onRecord, onLeave,
+  onToggleTranscribe, onToggleBreakout, onTogglePoll, onToggleQnA,
 }) {
   return (
     <div className={styles.bar}>
@@ -64,6 +67,29 @@ export default function Controls({
         <Btn onClick={onRaiseHand} active={handRaised} title={handRaised ? 'Lower hand' : 'Raise hand'}>
           <span className={styles.icon}>✋</span>
           <span className={styles.label}>{handRaised ? 'Lower' : 'Hand'}</span>
+        </Btn>
+      </div>
+
+      <div className={styles.divider} />
+
+      <div className={styles.group}>
+        <Btn onClick={onToggleTranscribe} active={transcribeOpen} title="Live Transcription">
+          <span className={styles.icon}>🎙</span>
+          <span className={styles.label}>Transcribe</span>
+        </Btn>
+        {isHost && (
+          <Btn onClick={onToggleBreakout} active={breakoutOpen} title="Breakout Rooms">
+            <span className={styles.icon}>🚪</span>
+            <span className={styles.label}>Breakout</span>
+          </Btn>
+        )}
+        <Btn onClick={onTogglePoll} active={pollOpen} badge={pollBadge} title="Polls">
+          <span className={styles.icon}>📊</span>
+          <span className={styles.label}>Polls</span>
+        </Btn>
+        <Btn onClick={onToggleQnA} active={qnaOpen} badge={qnaBadge} title="Q&A">
+          <span className={styles.icon}>❓</span>
+          <span className={styles.label}>Q&amp;A</span>
         </Btn>
       </div>
 

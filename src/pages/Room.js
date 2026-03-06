@@ -11,6 +11,10 @@ import Whiteboard from '../components/Whiteboard';
 import PipWindow from '../components/PipWindow';
 import SettingsPanel from '../components/SettingsPanel';
 import FloatingVideos from '../components/FloatingVideos';
+import TranscribePanel from '../components/TranscribePanel';
+import BreakoutPanel from '../components/BreakoutPanel';
+import PollPanel from '../components/PollPanel';
+import QnAPanel from '../components/QnAPanel';
 import styles from './Room.module.css';
 
 const API = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
@@ -54,8 +58,19 @@ export default function Room() {
   const [pinnedId, setPinnedId]           = useState(null);
   const [kicked, setKicked]               = useState(false);
   const [handRaised, setHandRaised]       = useState(false);
-  const [layout, setLayout]               = useState('grid'); // 'grid' | 'spotlight' | 'sidebar'
+  const [layout, setLayout]               = useState('grid');
   const [reactions, setReactions]         = useState([]);
+
+  // ── New feature panels ───────────────────────────────────────────────────────
+  const [transcribeOpen, setTranscribeOpen] = useState(false);
+  const [breakoutOpen, setBreakoutOpen]     = useState(false);
+  const [pollOpen, setPollOpen]             = useState(false);
+  const [qnaOpen, setQnaOpen]               = useState(false);
+
+  // ── Permissions (host grants to participants) ─────────────────────────────
+  const [transcribePermitted, setTranscribePermitted] = useState(false);
+  const [pollBadge, setPollBadge]           = useState(0);
+  const [qnaBadge, setQnaBadge]             = useState(0);
 
   // ── Peer meta ────────────────────────────────────────────────────────────────
   const [peerMeta, setPeerMeta]           = useState({});
@@ -158,6 +173,13 @@ export default function Room() {
     s.on('user-left', ({ socketId }) =>
       setPeerMeta(m => { const n = { ...m }; delete n[socketId]; return n; }));
 
+    // Transcription permission
+    s.on('transcribe-permission', ({ allowed }) => setTranscribePermitted(allowed));
+
+    // Poll/QnA badges when panels are closed
+    s.on('poll-new', () => { setPollBadge(b => b + 1); });
+    s.on('qna-new',  () => { setQnaBadge(b => b + 1);  });
+
     return () => s.disconnect();
   }, [nameConfirmed]);
 
@@ -175,7 +197,10 @@ export default function Room() {
   } = useWebRTC({ socket, roomId, userId, userName });
 
   // ── Meeting recorder (admin only) ─────────────────────────────────────────
-  const { recording, duration, startRecording } = useMeetingRecorder({ localStream, peers });
+  const { recording, duration, startRecording, stopRecording } = useMeetingRecorder({ localStream, peers });
+  const handleRecord = useCallback(() => {
+    if (recording) stopRecording(); else startRecording();
+  }, [recording, startRecording, stopRecording]);
 
   // ── Host force controls ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -500,6 +525,12 @@ export default function Room() {
         whiteboardOpen={whiteboardOpen} unread={unread}
         handRaised={handRaised} isHost={isHost}
         recording={recording}
+        transcribeOpen={transcribeOpen}
+        breakoutOpen={breakoutOpen}
+        pollOpen={pollOpen}
+        qnaOpen={qnaOpen}
+        pollBadge={pollOpen ? 0 : pollBadge}
+        qnaBadge={qnaOpen ? 0 : qnaBadge}
         onToggleAudio={toggleAudio}
         onToggleVideo={toggleVideo}
         onToggleScreen={toggleScreenShare}
@@ -508,8 +539,12 @@ export default function Room() {
         onRaiseHand={handleRaiseHand}
         onOpenSettings={() => setSettingsOpen(true)}
         onReaction={() => setReactionOpen(o => !o)}
-        onRecord={isHost ? startRecording : null}
+        onRecord={isHost ? handleRecord : null}
         onLeave={handleLeave}
+        onToggleTranscribe={() => setTranscribeOpen(o => !o)}
+        onToggleBreakout={() => setBreakoutOpen(o => !o)}
+        onTogglePoll={() => { setPollOpen(o => !o); setPollBadge(0); }}
+        onToggleQnA={() => { setQnaOpen(o => !o); setQnaBadge(0); }}
       />
 
       {/* ── Emoji reaction picker ── */}
@@ -558,6 +593,43 @@ export default function Room() {
         onDismiss={() => { pipDismissedRef.current = true; setPipVisible(false); }}
         onReturnToMeet={() => window.focus()}
       />
+
+      {/* ── Transcribe panel ── */}
+      {transcribeOpen && (
+        <TranscribePanel
+          isHost={isHost} socket={socket} roomId={roomId}
+          userId={userId} userName={userName}
+          permitted={transcribePermitted}
+          onClose={() => setTranscribeOpen(false)}
+        />
+      )}
+
+      {/* ── Breakout panel ── */}
+      {breakoutOpen && (
+        <BreakoutPanel
+          isHost={isHost} socket={socket} roomId={roomId}
+          userId={userId} userName={userName} peers={enrichedPeers}
+          onClose={() => setBreakoutOpen(false)}
+        />
+      )}
+
+      {/* ── Poll panel ── */}
+      {pollOpen && (
+        <PollPanel
+          isHost={isHost} socket={socket} roomId={roomId}
+          userId={userId}
+          onClose={() => setPollOpen(false)}
+        />
+      )}
+
+      {/* ── Q&A panel ── */}
+      {qnaOpen && (
+        <QnAPanel
+          isHost={isHost} socket={socket} roomId={roomId}
+          userId={userId} userName={userName}
+          onClose={() => setQnaOpen(false)}
+        />
+      )}
     </div>
   );
 }

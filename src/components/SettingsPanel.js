@@ -79,6 +79,12 @@ export default function SettingsPanel({ peers, socket, roomId, isHost, onClose, 
                         }}>
                         {wbPermissions[p.socketId] === false ? '⬜ WB off' : '⬜ WB on'}
                       </button>
+                      <button
+                        className={styles.wbBtn}
+                        title="Grant/revoke transcription access"
+                        onClick={() => emit('host-grant-transcribe', { targetSocketId: p.socketId, allowed: true })}>
+                        🎙 Transcribe
+                      </button>
                       <button className={`${styles.iconBtn} ${styles.kickBtn}`} title="Remove"
                         onClick={() => emit('kick-user', { targetSocketId: p.socketId })}>
                         🚫
