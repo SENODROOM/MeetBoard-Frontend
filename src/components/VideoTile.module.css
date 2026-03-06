@@ -1,94 +1,56 @@
 .tile {
-  position: relative;
-  background: var(--surface2);
-  border-radius: 14px;
-  overflow: hidden;
-  width: 100%; height: 100%;
-  border: 2px solid transparent;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  contain: layout paint;
+  position: relative; border-radius: 14px; overflow: hidden;
+  background: #060c18; aspect-ratio: 16/9;
+  border: 1.5px solid rgba(255,255,255,0.07);
+  transition: border-color .2s, box-shadow .2s;
+  container-type: inline-size;
 }
-
-.pinned { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,212,255,0.2), var(--glow); }
-
+.tile:hover { border-color: rgba(255,255,255,0.15); }
+.pinned { border-color: rgba(0,229,255,0.4) !important; box-shadow: 0 0 24px rgba(0,229,255,0.15); }
 .speaking {
-  border-color: var(--accent3);
-  box-shadow: 0 0 0 2px rgba(16,185,129,0.3), 0 0 20px rgba(16,185,129,calc(var(--vol,0) * 0.4));
+  border-color: rgba(15,255,163,0.6) !important;
+  box-shadow: 0 0 0 2px rgba(15,255,163,0.25), 0 0 32px rgba(15,255,163,0.12) !important;
 }
-
-.speakRing {
-  position: absolute; inset: -4px;
-  border-radius: 17px;
-  border: 3px solid var(--accent3);
-  pointer-events: none;
-  transition: opacity 0.1s;
-}
-
-.video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
-
+.video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .avatar {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(circle at 40% 35%,
-    hsl(calc(var(--hue, 200) + 40), 60%, 25%),
-    hsl(var(--hue, 200), 50%, 12%));
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, hsl(calc(var(--hue,200) * 1deg),35%,18%), #060c18 80%);
 }
 .avatar span {
-  font-size: clamp(24px, 6vw, 52px);
-  font-weight: 800;
-  color: hsl(var(--hue, 200), 80%, 75%);
-  letter-spacing: -1px;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  font-size: clamp(22px,6cqi,52px); font-weight: 800; color: rgba(255,255,255,.7);
+  font-family: var(--font-head, 'Syne', sans-serif); text-transform: uppercase; letter-spacing: -1px;
+  text-shadow: 0 2px 16px rgba(0,0,0,.5);
 }
-
+.speakRing {
+  position: absolute; inset: -2px; border-radius: 15px;
+  border: 2px solid rgba(15,255,163,0.7);
+  pointer-events: none; transition: opacity .12s;
+}
 .nameTag {
-  position: absolute; bottom: 10px; left: 10px;
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 20px 10px 8px;
+  background: linear-gradient(to top, rgba(0,0,0,.75) 0%, transparent 100%);
   display: flex; align-items: center; gap: 5px;
-  background: rgba(4,8,16,0.72);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 8px;
-  padding: 4px 9px;
-  max-width: calc(100% - 20px);
-  transition: all 0.15s;
 }
-.name { font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .muteIcon { font-size: 11px; }
 .youPill {
-  font-size: 9px; font-weight: 700;
-  background: rgba(0,212,255,0.15);
-  border: 1px solid rgba(0,212,255,0.3);
-  color: var(--accent);
-  border-radius: 4px; padding: 1px 5px;
-  font-family: var(--font-mono);
-  text-transform: uppercase; letter-spacing: 0.5px;
+  font-size: 9px; font-weight: 800; font-family: var(--font-mono,'Space Mono',monospace);
+  background: rgba(0,229,255,.15); border: 1px solid rgba(0,229,255,.35); color: #00e5ff;
+  border-radius: 4px; padding: 1px 5px; letter-spacing: .5px;
 }
-
-.pinBadge {
-  position: absolute; top: 8px; right: 8px;
-  background: rgba(0,212,255,0.15);
-  border: 1px solid rgba(0,212,255,0.3);
-  border-radius: 6px; padding: 3px 6px; font-size: 12px;
-}
-
+.name { font-size: 12px; font-weight: 600; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pinBadge { position: absolute; top: 8px; right: 8px; font-size: 13px; background: rgba(0,229,255,.15); border-radius: 6px; padding: 2px 4px; }
 .overlay {
-  position: absolute; inset: 0;
-  background: rgba(4,8,16,0.6);
-  backdrop-filter: blur(2px);
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 8px;
-  animation: fadeIn 0.12s ease;
+  position: absolute; inset: 0; background: rgba(0,0,0,.5); backdrop-filter: blur(2px);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  animation: fadeIn .12s ease;
 }
-@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
 .overlayBtn {
-  padding: 8px 18px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.18);
-  color: var(--text);
-  font-size: 13px; font-weight: 600;
-  border-radius: 9px;
-  transition: all 0.15s;
+  padding: 7px 14px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+  color: #fff; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: all .14s; backdrop-filter: blur(8px);
 }
-.overlayBtn:hover { background: rgba(0,212,255,0.18); border-color: var(--accent); color: var(--accent); }
-.kickBtn:hover { background: rgba(239,68,68,0.18) !important; border-color: var(--red) !important; color: var(--red) !important; }
+.overlayBtn:hover { background: rgba(255,255,255,.22); transform: scale(1.04); }
+.kickBtn { background: rgba(255,74,94,.15) !important; border-color: rgba(255,74,94,.35) !important; color: #ff4a5e !important; }
+.kickBtn:hover { background: rgba(255,74,94,.3) !important; }

@@ -5,257 +5,144 @@ import styles from './ClassroomDashboard.module.css';
 
 const API = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
 const THEMES = {
-  cyan:   { bg: 'linear-gradient(135deg,#00d4ff22,#0099bb11)', border: '#00d4ff44', accent: '#00d4ff' },
-  violet: { bg: 'linear-gradient(135deg,#7c3aed22,#5b21b611)', border: '#7c3aed44', accent: '#a78bfa' },
-  green:  { bg: 'linear-gradient(135deg,#10b98122,#05966911)', border: '#10b98144', accent: '#34d399' },
-  amber:  { bg: 'linear-gradient(135deg,#f59e0b22,#d9770611)', border: '#f59e0b44', accent: '#fcd34d' },
-  rose:   { bg: 'linear-gradient(135deg,#f4365622,#be123c11)', border: '#f4365644', accent: '#fb7185' },
+  cyan:   { accent:'#00e5ff', bg:'linear-gradient(135deg,#071828,#0a2a3a)' },
+  violet: { accent:'#b197fc', bg:'linear-gradient(135deg,#0f0821,#1e1040)' },
+  green:  { accent:'#10e88a', bg:'linear-gradient(135deg,#041410,#0a2a1e)' },
+  amber:  { accent:'#ffbe3c', bg:'linear-gradient(135deg,#140f02,#2a1f0a)' },
+  rose:   { accent:'#ff7eb3', bg:'linear-gradient(135deg,#150508,#2a0a14)' },
 };
+function getUserId(){let id=localStorage.getItem('qm_userId');if(!id){id=crypto.randomUUID();localStorage.setItem('qm_userId',id);}return id;}
 
-function getUserId() {
-  let id = localStorage.getItem('qm_userId');
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem('qm_userId', id); }
-  return id;
-}
-
-export default function ClassroomDashboard() {
-  const navigate = useNavigate();
-  const userId   = getUserId();
-  const userName = localStorage.getItem('qm_userName') || '';
-
-  const [classrooms, setClassrooms]   = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [modal, setModal]             = useState(null); // 'create' | 'join'
-  const [nameModal, setNameModal]     = useState(!userName);
-
-  // Create form
-  const [form, setForm] = useState({ name:'', description:'', subject:'', section:'', theme:'cyan' });
-  // Join form
-  const [inviteCode, setInviteCode] = useState('');
-  const [formError, setFormError]   = useState('');
-  const [tempName, setTempName]     = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const fetchClassrooms = useCallback(async () => {
-    if (!userId) return;
-    setLoading(true);
-    try {
-      const r = await fetch(`${API}/api/classrooms/user/${userId}`);
-      const d = await r.json();
-      setClassrooms(Array.isArray(d) ? d : []);
-    } catch { setClassrooms([]); }
-    finally { setLoading(false); }
-  }, [userId]);
-
-  useEffect(() => { if (userName) fetchClassrooms(); }, []);
-
-  const handleSaveName = () => {
-    if (!tempName.trim()) return;
-    localStorage.setItem('qm_userName', tempName.trim());
-    setNameModal(false);
-    fetchClassrooms();
+export default function ClassroomDashboard(){
+  const navigate=useNavigate();
+  const userId=getUserId();
+  const userName=localStorage.getItem('qm_userName')||'';
+  const[classrooms,setClassrooms]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[modal,setModal]=useState(null);
+  const[nameModal,setNameModal]=useState(!userName);
+  const[form,setForm]=useState({name:'',description:'',subject:'',section:'',theme:'cyan'});
+  const[inviteCode,setInviteCode]=useState('');
+  const[formError,setFormError]=useState('');
+  const[tempName,setTempName]=useState('');
+  const[submitting,setSubmitting]=useState(false);
+  const fetchClassrooms=useCallback(async()=>{setLoading(true);try{const r=await fetch(`${API}/api/classrooms/user/${userId}`);const d=await r.json();setClassrooms(Array.isArray(d)?d:[]);}catch{setClassrooms([]);}finally{setLoading(false);};},[userId]);
+  useEffect(()=>{if(userName) fetchClassrooms();},[]);
+  const handleSaveName=()=>{if(!tempName.trim()) return;localStorage.setItem('qm_userName',tempName.trim());setNameModal(false);fetchClassrooms();};
+  const handleCreate=async()=>{
+    const uName=localStorage.getItem('qm_userName')||'';
+    if(!form.name.trim()){setFormError('Classroom name is required');return;}
+    if(!uName){setFormError('Please set your name first');return;}
+    setSubmitting(true);setFormError('');
+    try{const r=await fetch(`${API}/api/classrooms`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...form,creatorId:userId,creatorName:uName})});const d=await r.json();if(d.error){setFormError(d.error);return;}setModal(null);setForm({name:'',description:'',subject:'',section:'',theme:'cyan'});navigate(`/classroom/${d.classroomId}`);}
+    catch{setFormError('Server error');}finally{setSubmitting(false);}
   };
-
-  const handleCreate = async () => {
-    const uName = localStorage.getItem('qm_userName') || '';
-    if (!form.name.trim()) { setFormError('Classroom name is required'); return; }
-    if (!uName) { setFormError('Please set your name first'); return; }
-    setSubmitting(true); setFormError('');
-    try {
-      const r = await fetch(`${API}/api/classrooms`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, creatorId: userId, creatorName: uName }),
-      });
-      const d = await r.json();
-      if (d.error) { setFormError(d.error); return; }
-      setModal(null); setForm({ name:'',description:'',subject:'',section:'',theme:'cyan' });
-      navigate(`/classroom/${d.classroomId}`);
-    } catch(e) { setFormError('Server error — is the server running?'); }
-    finally { setSubmitting(false); }
+  const handleJoin=async()=>{
+    const uName=localStorage.getItem('qm_userName')||'';
+    if(!inviteCode.trim()){setFormError('Enter an invite code');return;}
+    if(!uName){setFormError('Please set your name first');return;}
+    setSubmitting(true);setFormError('');
+    try{const r=await fetch(`${API}/api/classrooms/join`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({inviteCode:inviteCode.trim(),userId,userName:uName})});const d=await r.json();if(d.error){setFormError(d.error);return;}setModal(null);setInviteCode('');navigate(`/classroom/${d.classroomId}`);}
+    catch{setFormError('Server error');}finally{setSubmitting(false);}
   };
-
-  const handleJoin = async () => {
-    const uName = localStorage.getItem('qm_userName') || '';
-    if (!inviteCode.trim()) { setFormError('Enter an invite code'); return; }
-    if (!uName) { setFormError('Please set your name first'); return; }
-    setSubmitting(true); setFormError('');
-    try {
-      const r = await fetch(`${API}/api/classrooms/join`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inviteCode: inviteCode.trim(), userId, userName: uName }),
-      });
-      const d = await r.json();
-      if (d.error) { setFormError(d.error); return; }
-      setModal(null); setInviteCode('');
-      navigate(`/classroom/${d.classroomId}`);
-    } catch(e) { setFormError('Server error'); }
-    finally { setSubmitting(false); }
-  };
-
-  const uName = localStorage.getItem('qm_userName') || '';
-
-  if (nameModal) return (
+  const currentName=localStorage.getItem('qm_userName')||'';
+  return(
     <div className={styles.page}>
-      <div className={styles.bg}><div className={styles.orb1}/><div className={styles.orb2}/></div>
-      <div className={styles.nameCard}>
-        <div className={styles.nameLogo}>⬡ QuantumMeet</div>
-        <h2>What's your name?</h2>
-        <p>Used across meetings and classrooms.</p>
-        <input className={styles.nameInput} placeholder="Your full name" value={tempName}
-          autoFocus onChange={e => setTempName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSaveName()} />
-        <button className={styles.nameSaveBtn} onClick={handleSaveName}>Continue →</button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className={styles.page}>
-      <div className={styles.bg}><div className={styles.orb1}/><div className={styles.orb2}/><div className={styles.grid}/></div>
-
-      {/* Nav */}
-      <nav className={styles.nav}>
-        <button className={styles.logoBtn} onClick={() => navigate('/')}>
-          <span className={styles.logoIcon}>⬡</span>
-          <span>Quantum<strong>Meet</strong></span>
-        </button>
-        <div className={styles.navCenter}>
-          <button className={styles.navTab} onClick={() => navigate('/')}>🏠 Meetings</button>
-          <button className={`${styles.navTab} ${styles.navTabActive}`}>🎓 Classrooms</button>
+      {nameModal&&(
+        <div className={styles.namePromptOverlay}>
+          <div className={styles.namePromptCard}>
+            <span style={{fontSize:48}}>👋</span>
+            <h2>What's your name?</h2>
+            <p>Your name will appear to teachers and classmates.</p>
+            <input className={styles.formInput} placeholder="Your full name" value={tempName} autoFocus onChange={e=>setTempName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSaveName()}/>
+            <button className={styles.btnSubmit} style={{width:'100%',padding:12}} onClick={handleSaveName} disabled={!tempName.trim()}>Continue →</button>
+          </div>
         </div>
+      )}
+      <nav className={styles.nav}>
+        <div className={styles.navLogo}><span className={styles.logoIcon}>⬡</span><span>Quantum<strong>Meet</strong></span></div>
         <div className={styles.navRight}>
-          <div className={styles.avatar}>{uName?.[0]?.toUpperCase()||'?'}</div>
-          <span className={styles.navName}>{uName}</span>
+          {currentName&&<div className={styles.userChip}><div className={styles.userAvatar}>{currentName[0].toUpperCase()}</div><span>{currentName}</span></div>}
+          <button className={styles.btnJoin} onClick={()=>navigate('/')}>← Meet</button>
         </div>
       </nav>
-
-      <main className={styles.main}>
-        {/* Header */}
-        <div className={styles.header}>
-          <div>
-            <h1 className={styles.title}>🎓 Your Classrooms</h1>
-            <p className={styles.subtitle}>Manage classes, assignments, and sessions</p>
+      <div className={styles.main}>
+        <div className={styles.topBar}>
+          <div className={styles.greeting}>
+            <h1>{currentName?`Hey, ${currentName.split(' ')[0]} 👋`:'Your Classrooms'}</h1>
+            <p>{classrooms.length} classroom{classrooms.length!==1?'s':''} · {new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</p>
           </div>
-          <div className={styles.headerBtns}>
-            <button className={styles.joinBtn} onClick={() => { setModal('join'); setFormError(''); }}>
-              + Join class
-            </button>
-            <button className={styles.createBtn} onClick={() => { setModal('create'); setFormError(''); }}>
-              + Create class
-            </button>
+          <div className={styles.topActions}>
+            <button className={styles.btnJoin} onClick={()=>{setModal('join');setFormError('');}}>🔗 Join Class</button>
+            <button className={styles.btnCreate} onClick={()=>{setModal('create');setFormError('');}}>+ Create Class</button>
           </div>
         </div>
-
-        {/* Classrooms grid */}
-        {loading ? (
-          <div className={styles.loadingState}>
-            <div className={styles.spinner}/><span>Loading classrooms…</span>
-          </div>
-        ) : classrooms.length === 0 ? (
+        {loading&&<div className={styles.loading}><div className={styles.spinner}/><span>Loading classrooms…</span></div>}
+        {!loading&&classrooms.length===0&&(
           <div className={styles.emptyState}>
-            <span className={styles.emptyIcon}>🎓</span>
-            <h3>No classrooms yet</h3>
-            <p>Create a class or join one with an invite code.</p>
-            <div className={styles.emptyBtns}>
-              <button className={styles.createBtn} onClick={() => setModal('create')}>+ Create class</button>
-              <button className={styles.joinBtn}   onClick={() => setModal('join')}>+ Join class</button>
+            <div className={styles.emptyIcon}>🎓</div>
+            <h2>No classrooms yet</h2>
+            <p>Create a new classroom or join one with an invite code from your teacher.</p>
+            <div style={{display:'flex',gap:10,marginTop:8}}>
+              <button className={styles.btnJoin} onClick={()=>{setModal('join');setFormError('');}}>🔗 Join with Code</button>
+              <button className={styles.btnCreate} onClick={()=>{setModal('create');setFormError('');}}>+ Create Classroom</button>
             </div>
           </div>
-        ) : (
+        )}
+        {!loading&&classrooms.length>0&&(
           <div className={styles.grid}>
-            {classrooms.map(c => {
-              const th = THEMES[c.theme] || THEMES.cyan;
-              const role = c.members?.find(m => m.userId === userId)?.role || 'student';
-              return (
-                <div key={c.classroomId} className={styles.card}
-                  style={{ background: th.bg, borderColor: th.border }}
-                  onClick={() => navigate(`/classroom/${c.classroomId}`)}>
-                  <div className={styles.cardHeader}>
-                    <div className={styles.cardIcon} style={{ background: th.accent + '22', border: `1px solid ${th.border}` }}>
-                      📚
-                    </div>
-                    <span className={styles.roleBadge} style={{ color: th.accent, borderColor: th.border }}>
-                      {role === 'teacher' ? '👩‍🏫 Teacher' : '🎓 Student'}
-                    </span>
+            {classrooms.map(c=>{
+              const th=THEMES[c.theme||'cyan'];const isOwner=c.creatorId===userId;const members=c.members||[];const students=members.filter(m=>m.role==='student');
+              return(
+                <div key={c.classroomId} className={styles.classCard} onClick={()=>navigate(`/classroom/${c.classroomId}`)}>
+                  {c.archived&&<div className={styles.archivedBadge}>Archived</div>}
+                  <div className={styles.cardBanner} style={{background:th.bg}}>
+                    <div className={styles.cardBannerGlow} style={{background:`radial-gradient(ellipse at 20% 50%, ${th.accent}25, transparent 70%)`}}/>
+                    <div className={styles.cardBannerNoise}/>
+                    <div className={styles.cardBannerText}>{c.name[0]}</div>
+                    {isOwner&&<div className={styles.cardTeacherBadge} style={{color:th.accent}}>👑 Teacher</div>}
                   </div>
-                  <h3 className={styles.cardTitle} style={{ color: th.accent }}>{c.name}</h3>
-                  {c.subject && <p className={styles.cardSubject}>{c.subject}{c.section ? ` · ${c.section}` : ''}</p>}
-                  {c.description && <p className={styles.cardDesc}>{c.description}</p>}
-                  <div className={styles.cardFooter}>
-                    <span>👥 {c.members?.length||0} member{c.members?.length !== 1 ? 's' : ''}</span>
-                    <span className={styles.cardInvite}>#{c.inviteCode}</span>
+                  <div className={styles.cardBody}>
+                    <div className={styles.cardTitle}>{c.name}</div>
+                    <div className={styles.cardMeta}>{[c.subject,c.section].filter(Boolean).join(' · ')||'General'}</div>
+                    <div className={styles.cardStats}>
+                      <span className={styles.cardStat}>👥 {students.length}</span>
+                      {c.inviteCode&&<span className={styles.cardStat} style={{color:th.accent,borderColor:`${th.accent}30`}}>{c.inviteCode}</span>}
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-      </main>
-
-      {/* ── Create modal ── */}
-      {modal === 'create' && (
-        <div className={styles.modalOverlay} onClick={e => e.target===e.currentTarget && setModal(null)}>
-          <div className={styles.modal}>
-            <div className={styles.modalHeader}>
-              <span>🎓 Create a classroom</span>
-              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
+      </div>
+      {/* Create Modal */}
+      {modal==='create'&&(
+        <div className={styles.modalOverlay} onClick={()=>setModal(null)}>
+          <div className={styles.modal} onClick={e=>e.stopPropagation()}>
+            <div className={styles.modalHeader}><span className={styles.modalTitle}>Create Classroom</span><button className={styles.modalClose} onClick={()=>setModal(null)}>✕</button></div>
+            {formError&&<div className={styles.formError}>{formError}</div>}
+            <div className={styles.formGroup}><label className={styles.formLabel}>Class Name *</label><input className={styles.formInput} placeholder="e.g. Advanced Mathematics" autoFocus value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div className={styles.formGroup}><label className={styles.formLabel}>Subject</label><input className={styles.formInput} placeholder="e.g. Math" value={form.subject} onChange={e=>setForm(f=>({...f,subject:e.target.value}))}/></div>
+              <div className={styles.formGroup}><label className={styles.formLabel}>Section</label><input className={styles.formInput} placeholder="e.g. Period 3" value={form.section} onChange={e=>setForm(f=>({...f,section:e.target.value}))}/></div>
             </div>
-            <div className={styles.modalBody}>
-              {formError && <div className={styles.formError}>{formError}</div>}
-              <label className={styles.label}>Class name *</label>
-              <input className={styles.input} placeholder="e.g. Physics 101" value={form.name}
-                onChange={e => setForm(f=>({...f,name:e.target.value}))} autoFocus />
-              <label className={styles.label}>Subject</label>
-              <input className={styles.input} placeholder="e.g. Physics" value={form.subject}
-                onChange={e => setForm(f=>({...f,subject:e.target.value}))} />
-              <label className={styles.label}>Section</label>
-              <input className={styles.input} placeholder="e.g. Period 2" value={form.section}
-                onChange={e => setForm(f=>({...f,section:e.target.value}))} />
-              <label className={styles.label}>Description</label>
-              <textarea className={styles.textarea} placeholder="What's this class about?" value={form.description}
-                onChange={e => setForm(f=>({...f,description:e.target.value}))} rows={3} />
-              <label className={styles.label}>Theme color</label>
-              <div className={styles.themeRow}>
-                {Object.entries(THEMES).map(([key, th]) => (
-                  <button key={key}
-                    className={`${styles.themeBtn} ${form.theme===key ? styles.themeBtnActive : ''}`}
-                    style={{ background: th.accent, boxShadow: form.theme===key ? `0 0 0 3px #fff, 0 0 0 5px ${th.accent}` : 'none' }}
-                    onClick={() => setForm(f=>({...f,theme:key}))} />
-                ))}
-              </div>
+            <div className={styles.formGroup}><label className={styles.formLabel}>Description</label><textarea className={styles.formTextarea} rows={2} placeholder="What is this class about?" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
+            <div className={styles.formGroup}><label className={styles.formLabel}>Theme Color</label>
+              <div className={styles.themeRow}>{Object.entries(THEMES).map(([t,v])=><button key={t} className={`${styles.themeChip} ${form.theme===t?styles.themeChipActive:''}`} style={{borderColor:v.accent,color:v.accent,background:form.theme===t?`${v.accent}15`:''}} onClick={()=>setForm(f=>({...f,theme:t}))}>{t}</button>)}</div>
             </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.modalCancel} onClick={() => setModal(null)}>Cancel</button>
-              <button className={styles.modalCreate} onClick={handleCreate} disabled={submitting}>
-                {submitting ? <span className={styles.spinner}/> : 'Create classroom'}
-              </button>
-            </div>
+            <div className={styles.modalActions}><button className={styles.btnCancel} onClick={()=>setModal(null)}>Cancel</button><button className={styles.btnSubmit} onClick={handleCreate} disabled={submitting||!form.name.trim()}>{submitting?'Creating…':'Create Classroom'}</button></div>
           </div>
         </div>
       )}
-
-      {/* ── Join modal ── */}
-      {modal === 'join' && (
-        <div className={styles.modalOverlay} onClick={e => e.target===e.currentTarget && setModal(null)}>
-          <div className={styles.modal}>
-            <div className={styles.modalHeader}>
-              <span>🔑 Join a classroom</span>
-              <button className={styles.modalClose} onClick={() => setModal(null)}>✕</button>
-            </div>
-            <div className={styles.modalBody}>
-              {formError && <div className={styles.formError}>{formError}</div>}
-              <label className={styles.label}>Invite code</label>
-              <input className={styles.input} placeholder="e.g. ABC123" value={inviteCode}
-                onChange={e => setInviteCode(e.target.value.toUpperCase())} autoFocus
-                onKeyDown={e => e.key === 'Enter' && handleJoin()} />
-              <p className={styles.joinHint}>Ask your teacher for the 6-character invite code.</p>
-            </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.modalCancel} onClick={() => setModal(null)}>Cancel</button>
-              <button className={styles.modalCreate} onClick={handleJoin} disabled={submitting}>
-                {submitting ? <span className={styles.spinner}/> : 'Join classroom'}
-              </button>
-            </div>
+      {/* Join Modal */}
+      {modal==='join'&&(
+        <div className={styles.modalOverlay} onClick={()=>setModal(null)}>
+          <div className={styles.modal} onClick={e=>e.stopPropagation()}>
+            <div className={styles.modalHeader}><span className={styles.modalTitle}>Join Classroom</span><button className={styles.modalClose} onClick={()=>setModal(null)}>✕</button></div>
+            {formError&&<div className={styles.formError}>{formError}</div>}
+            <div className={styles.formGroup}><label className={styles.formLabel}>Invite Code</label><input className={styles.formInput} placeholder="Enter the code from your teacher" autoFocus value={inviteCode} onChange={e=>setInviteCode(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleJoin()}/></div>
+            <div className={styles.modalActions}><button className={styles.btnCancel} onClick={()=>setModal(null)}>Cancel</button><button className={styles.btnSubmit} onClick={handleJoin} disabled={submitting||!inviteCode.trim()}>{submitting?'Joining…':'Join Classroom'}</button></div>
           </div>
         </div>
       )}
