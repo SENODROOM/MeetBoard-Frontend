@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import styles from './Home.module.css';
 
 const API = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
+const SOCKET_URL = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
 
 function getUserId() {
   let id = localStorage.getItem('qm_userId');
@@ -96,7 +97,7 @@ export default function Home() {
   const joinSecretQueue = () => {
     if (!userName.trim()) { setError('Enter your name first'); setTab('home'); return; }
     localStorage.setItem('qm_userName', userName);
-    const s = io(API, { transports: ['websocket', 'polling'] });
+    const s = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     secretSocketRef.current = s;
 
     s.on('connect', () => {

@@ -647,7 +647,7 @@ function SubmissionDetail({sub,post,classroomId,th,onGrade,onReturn,onAnnotate,o
 // GRADE BOOK TAB
 // ══════════════════════════════════════════════════════════════════════════════
 function GradeBookTab({classroomId,classroom,th,showToast,posts}){
-  const[data,setData]=useState({});const[loading,setLoading]=useState(true);const[selectedStudent,setSelectedStudent]=useState(null);const[inlineGrades,setInlineGrades]=useState({});const[saving,setSaving]=useState({});const[exportFormat,setExportFormat]=useState(null);
+  const[data,setData]=useState({});const[loading,setLoading]=useState(true);const[selectedStudent,setSelectedStudent]=useState(null);
   const assignments=posts.filter(p=>p.type==='assignment');
   const students=classroom?.members?.filter(m=>m.role==='student')||[];
   useEffect(()=>{if(!students.length){setLoading(false);return;}
@@ -657,10 +657,9 @@ function GradeBookTab({classroomId,classroom,th,showToast,posts}){
   const getSub=(studentId,postId)=>data[postId]?.find(s=>s.studentId===studentId);
   const getAvg=(studentId)=>{const graded=assignments.filter(a=>getSub(studentId,a.postId)?.grade!=null);if(!graded.length) return null;return(graded.reduce((sum,a)=>sum+getSub(studentId,a.postId).grade,0)/graded.length).toFixed(1);};
   const handleInlineSave=async(postId,subId,grade)=>{
-    const key=`${subId}`;setSaving(s=>({...s,[key]:true}));
     await fetch(`${API}/api/classrooms/${classroomId}/posts/${postId}/submissions/${subId}/grade`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({grade:Number(grade),status:'graded'})});
     setData(d=>({...d,[postId]:d[postId]?.map(s=>s.submissionId===subId?{...s,grade:Number(grade),status:'graded'}:s)||[]}));
-    setSaving(s=>({...s,[key]:false}));showToast('Grade saved!');
+    showToast('Grade saved!');
   };
   const exportCSV=()=>{
     const rows=[['Student',...assignments.map(a=>a.title),'Average']];
@@ -710,7 +709,7 @@ function GradeBookTab({classroomId,classroom,th,showToast,posts}){
             <tbody>{students.map(st=>{const avg=getAvg(st.userId);return(
               <tr key={st.userId}>
                 <td style={{fontWeight:600,fontSize:13,whiteSpace:'nowrap'}}><span style={{cursor:'pointer',color:th.accent}} onClick={()=>setSelectedStudent(st.userId)}>{st.userName}</span></td>
-                {assignments.map(a=>{const sub=getSub(st.userId,a.postId);const key=sub?.submissionId;return(
+                {assignments.map(a=>{const sub=getSub(st.userId,a.postId);return(
                   <td key={a.postId}>
                     {sub?(
                       <div style={{display:'flex',flexDirection:'column',gap:3,alignItems:'center'}}>
@@ -800,7 +799,6 @@ function AnalyticsTab({classroomId,classroom,th,posts}){
 function AttendanceTab({classroomId,classroom,sessions,th,showToast}){
   const[selected,setSelected]=useState(sessions[0]?._id||null);const[records,setRecords]=useState([]);const[saving,setSaving]=useState(false);const[loading,setLoading]=useState(false);
   const students=classroom?.members?.filter(m=>m.role==='student')||[];
-  const session=sessions.find(s=>s._id===selected);
   useEffect(()=>{if(!selected) return;setLoading(true);
     fetch(`${API}/api/classrooms/${classroomId}/attendance?sessionId=${selected}`).then(r=>r.json()).then(d=>{setRecords(Array.isArray(d)?d:[]);}).catch(()=>setRecords([])).finally(()=>setLoading(false));
   },[selected]);
@@ -1011,7 +1009,6 @@ function QuizTake({quiz,classroomId,userId,userName,th,onBack,showToast}){
 // ══════════════════════════════════════════════════════════════════════════════
 function PeopleTab({classroom,setClassroom,isTeacher,userId,th,fetchClassroom,classroomId,showToast}){
   const handleKick=async(memberId)=>{if(!window.confirm('Remove this student?')) return;await fetch(`${API}/api/classrooms/${classroomId}/members/${memberId}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})});fetchClassroom();showToast('Student removed');};
-  const handlePromote=async(memberId)=>{await fetch(`${API}/api/classrooms/${classroomId}/members/${memberId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'teacher',userId})});fetchClassroom();showToast('Promoted to teacher!');};
   const teachers=[classroom.creatorId,...(classroom.members?.filter(m=>m.role==='teacher').map(m=>m.userId)||[])];
   const students=classroom.members?.filter(m=>m.role==='student')||[];
   return(

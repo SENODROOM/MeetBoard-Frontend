@@ -100,8 +100,6 @@ export default function PollPanel({ isHost, socket, roomId, userId, onClose }) {
         {/* Poll cards - active first */}
         {[...polls].sort((a,b) => (b.active?1:0)-(a.active?1:0)).map(poll => {
           const total = totalVotes(poll);
-          const myVote = myVotes[poll.id];
-          const hasVoted = myVote !== undefined && myVote >= 0;
           const showResults = !poll.active || (isHost);
           return (
             <div key={poll.id} className={`${styles.pollCard} ${!poll.active ? styles.ended : ''}`}>

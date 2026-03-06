@@ -18,6 +18,7 @@ import QnAPanel from '../components/QnAPanel';
 import styles from './Room.module.css';
 
 const API = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
+const SOCKET_URL = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
 
 export default function Room() {
   const { roomId }  = useParams();
@@ -138,7 +139,7 @@ export default function Room() {
   // ── Socket init ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!nameConfirmed) return;
-    const s = io(API, { transports: ['websocket', 'polling'] });
+    const s = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     socketRef.current = s;
     setSocket(s);
 
