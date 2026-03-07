@@ -135,7 +135,7 @@ export default function Home() {
       {/* Nav */}
       <nav className={styles.nav}>
         <div className={styles.logo}>
-          <div className={styles.logoMark}>⬡</div>
+          <img src="/logo.png" alt="QuantumMeet" className={styles.logoImage} />
           <span>Quantum<strong>Meet</strong></span>
         </div>
         <div className={styles.navTabs}>

@@ -54,7 +54,11 @@
   font-weight: 700;
   color: var(--accent);
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+.logoImage { height: 16px; width: auto; }
 .headerBtns { display: flex; gap: 5px; }
 .returnBtn {
   padding: 3px 10px;

@@ -86,7 +86,7 @@ export default function PipWindow({
     >
       {/* Header */}
       <div className={styles.header}>
-        <span className={styles.logo}>⬡ QuantumMeet</span>
+        <span className={styles.logo}><img src="/logo.png" alt="QuantumMeet" className={styles.logoImage} /> QuantumMeet</span>
         <div className={styles.headerBtns}>
           <button className={styles.returnBtn} onClick={onReturnToMeet}>↩ Return</button>
           <button className={styles.closeBtn}  onClick={onDismiss}>✕</button>

@@ -306,7 +306,7 @@ export default function Room() {
   // ── Wait screens ──────────────────────────────────────────────────────────────
   if (!nameConfirmed) return (
     <div className={styles.waitScreen}><div className={styles.waitCard}>
-      <div className={styles.waitLogo}>⬡ QuantumMeet</div>
+      <div className={styles.waitLogo}><img src="/logo.png" alt="QuantumMeet" className={styles.waitLogoImage} /> QuantumMeet</div>
       <h2>What's your name?</h2>
       <p>Enter your display name to join this meeting.</p>
       <input className={styles.waitInput} type="text" placeholder="Your name"
@@ -373,7 +373,7 @@ export default function Room() {
       {/* ── Topbar ── */}
       <div className={styles.topbar}>
         <div className={styles.logo}>
-          <span className={styles.logoIcon}>⬡</span>
+          <img src="/logo.png" alt="QuantumMeet" className={styles.logoIconImage} />
           <span>Quantum<strong>Meet</strong></span>
           {classroomId && <span className={styles.classroomPill}>🎓 Class</span>}
         </div>

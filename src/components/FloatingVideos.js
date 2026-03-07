@@ -45,7 +45,7 @@ export default function FloatingVideos({ localStream, peers, localUserName, audi
   return (
     <div ref={stripRef} className={styles.strip} style={style} onMouseDown={onMouseDown}>
       <div className={styles.header}>
-        <span className={styles.logo}>⬡ In call</span>
+        <span className={styles.logo}><img src="/logo.png" alt="QuantumMeet" className={styles.logoImage} /> In call</span>
         <div className={styles.headerRight}>
           <span className={styles.count}>{all.length}</span>
           <button className={styles.collapseBtn} onClick={() => setCollapsed(c => !c)}>

@@ -138,7 +138,7 @@ export default function SettingsPanel({ peers, socket, roomId, isHost, onClose, 
 
               <span className={styles.sectionLabel} style={{marginTop: 16}}>About</span>
               <div className={styles.about}>
-                <span className={styles.aboutLogo}>⬡ QuantumMeet</span>
+                <span className={styles.aboutLogo}><img src="/logo.png" alt="QuantumMeet" className={styles.aboutLogoImage} /> QuantumMeet</span>
                 <p>WebRTC · Socket.io · React · Node.js</p>
                 <p>End-to-end encrypted peer connections via STUN/TURN.</p>
               </div>

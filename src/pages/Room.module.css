@@ -12,6 +12,7 @@
 .logo { display:flex; align-items:center; gap:7px; font-size:15px; font-weight:800; color:var(--text); white-space:nowrap; font-family:var(--font-head,'Syne',sans-serif); }
 .logo strong { color:var(--accent); }
 .logoIcon { font-size:17px; color:var(--accent); filter:drop-shadow(0 0 8px rgba(0,229,255,.6)); }
+.logoIconImage { height:20px; width:auto; filter:drop-shadow(0 0 8px rgba(0,229,255,.6)); }
 .classroomPill { padding:2px 8px; background:rgba(157,113,255,.12); border:1px solid rgba(157,113,255,.25); color:#b197fc; font-size:9px; font-family:var(--font-mono,'Space Mono',monospace); border-radius:4px; text-transform:uppercase; letter-spacing:.5px; }
 .roomInfo { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
 .publicPill  { padding:2px 7px; background:rgba(0,229,255,.07); border:1px solid rgba(0,229,255,.18); color:var(--accent); font-size:9px; font-family:var(--font-mono,'Space Mono',monospace); border-radius:4px; }
@@ -72,7 +73,8 @@
 /* ── Wait screens ── */
 .waitScreen { height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg,#020509); background-image:radial-gradient(ellipse at 30% 20%, rgba(0,229,255,.05), transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(157,113,255,.05), transparent 60%); }
 .waitCard { background:rgba(6,12,24,.92); border:1px solid rgba(255,255,255,.09); border-radius:22px; padding:44px 38px; display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; max-width:400px; width:90vw; box-shadow:0 20px 60px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.06); backdrop-filter:blur(24px); }
-.waitLogo { font-size:18px; font-weight:800; color:var(--accent); font-family:var(--font-head,'Syne',sans-serif); }
+.waitLogo { font-size:18px; font-weight:800; color:var(--accent); font-family:var(--font-head,'Syne',sans-serif); display:flex; align-items:center; gap:8px; }
+.waitLogoImage { height:22px; width:auto; filter:drop-shadow(0 0 8px rgba(0,229,255,.6)); }
 .waitCard h2 { font-size:22px; font-weight:800; font-family:var(--font-head,'Syne',sans-serif); }
 .waitCard p  { color:var(--text-2); font-size:14px; line-height:1.5; }
 .waitInput { width:100%; padding:12px 14px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); color:var(--text); font-size:15px; border-radius:11px; outline:none; transition:all .18s; font-family:var(--font-ui,'Outfit',sans-serif); }

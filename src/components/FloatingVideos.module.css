@@ -25,7 +25,8 @@
   border-bottom: 1px solid rgba(0,212,255,0.08);
   gap: 8px;
 }
-.logo { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--accent); }
+.logo { font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 4px; }
+.logoImage { height: 14px; width: auto; }
 .headerRight { display: flex; align-items: center; gap: 6px; }
 .count {
   font-size: 10px; font-family: var(--font-mono); color: var(--text-muted);

@@ -165,5 +165,6 @@
   border-radius: 10px; padding: 14px 16px;
   display: flex; flex-direction: column; gap: 5px;
 }
-.aboutLogo { font-family: var(--font-display); font-weight: 800; color: var(--accent); font-size: 15px; }
+.aboutLogo { font-family: var(--font-display); font-weight: 800; color: var(--accent); font-size: 15px; display: flex; align-items: center; gap: 6px; }
+.aboutLogoImage { height: 18px; width: auto; }
 .about p { margin: 0; font-size: 12px; color: var(--text-muted); }

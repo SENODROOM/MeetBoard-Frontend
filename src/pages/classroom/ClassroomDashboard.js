@@ -60,7 +60,7 @@ export default function ClassroomDashboard(){
         </div>
       )}
       <nav className={styles.nav}>
-        <div className={styles.navLogo}><span className={styles.logoIcon}>⬡</span><span>Quantum<strong>Meet</strong></span></div>
+        <div className={styles.navLogo}><img src="/logo.png" alt="QuantumMeet" className={styles.logoIconImage} /><span>Quantum<strong>Meet</strong></span></div>
         <div className={styles.navRight}>
           {currentName&&<div className={styles.userChip}><div className={styles.userAvatar}>{currentName[0].toUpperCase()}</div><span>{currentName}</span></div>}
           <button className={styles.btnJoin} onClick={()=>navigate('/')}>← Meet</button>
