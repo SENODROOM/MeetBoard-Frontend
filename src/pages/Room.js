@@ -1,49 +1,59 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { io } from 'socket.io-client';
-import { useWebRTC } from '../hooks/useWebRTC';
-import { useMeetingRecorder } from '../hooks/useMeetingRecorder';
-import { useSounds } from '../hooks/useSounds';
-import VideoTile from '../components/VideoTile';
-import ChatPanel from '../components/ChatPanel';
-import Controls from '../components/Controls';
-import Whiteboard from '../components/Whiteboard';
-import PipWindow from '../components/PipWindow';
-import DocumentPipPortal from '../components/DocumentPipPortal';
-import SettingsPanel from '../components/SettingsPanel';
-import FloatingVideos from '../components/FloatingVideos';
-import TranscribePanel from '../components/TranscribePanel';
-import BreakoutPanel from '../components/BreakoutPanel';
-import PollPanel from '../components/PollPanel';
-import QnAPanel from '../components/QnAPanel';
-import styles from './Room.module.css';
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { io } from "socket.io-client";
+import { useWebRTC } from "../hooks/useWebRTC";
+import { useMeetingRecorder } from "../hooks/useMeetingRecorder";
+import { useSounds } from "../hooks/useSounds";
+import VideoTile from "../components/VideoTile";
+import ChatPanel from "../components/ChatPanel";
+import Controls from "../components/Controls";
+import Whiteboard from "../components/Whiteboard";
+import PipWindow from "../components/PipWindow";
+import DocumentPipPortal from "../components/DocumentPipPortal";
+import SettingsPanel from "../components/SettingsPanel";
+import FloatingVideos from "../components/FloatingVideos";
+import TranscribePanel from "../components/TranscribePanel";
+import BreakoutPanel from "../components/BreakoutPanel";
+import PollPanel from "../components/PollPanel";
+import QnAPanel from "../components/QnAPanel";
+import styles from "./Room.module.css";
 
-const API = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
-const SOCKET_URL = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
+const API = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
+const SOCKET_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
 
 export default function Room() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const classroomId = new URLSearchParams(location.search).get('classroom');
+  const classroomId = new URLSearchParams(location.search).get("classroom");
 
   // ── Identity — ALL declared first, nothing above these ──────────────────────
-  const [userName, setUserName] = useState(() => localStorage.getItem('qm_userName') || '');
+  const [userName, setUserName] = useState(
+    () => localStorage.getItem("qm_userName") || "",
+  );
   const [userId] = useState(() => {
-    let id = localStorage.getItem('qm_userId');
-    if (!id) { id = crypto.randomUUID(); localStorage.setItem('qm_userId', id); }
+    let id = localStorage.getItem("qm_userId");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("qm_userId", id);
+    }
     return id;
   });
   const isHost = !!localStorage.getItem(`qm_host_${roomId}`);
 
   // ── Username gate ────────────────────────────────────────────────────────────
-  const [nameConfirmed, setNameConfirmed] = useState(() => !!localStorage.getItem('qm_userName'));
-  const [nameInput, setNameInput] = useState('');
-  const [nameError, setNameError] = useState('');
+  const [nameConfirmed, setNameConfirmed] = useState(
+    () => !!localStorage.getItem("qm_userName"),
+  );
+  const [nameInput, setNameInput] = useState("");
+  const [nameError, setNameError] = useState("");
   const confirmName = () => {
-    if (!nameInput.trim()) { setNameError('Please enter your name'); return; }
-    localStorage.setItem('qm_userName', nameInput.trim());
+    if (!nameInput.trim()) {
+      setNameError("Please enter your name");
+      return;
+    }
+    localStorage.setItem("qm_userName", nameInput.trim());
     setUserName(nameInput.trim());
     setNameConfirmed(true);
   };
@@ -61,7 +71,7 @@ export default function Room() {
   const [pinnedId, setPinnedId] = useState(null);
   const [kicked, setKicked] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
-  const [layout, setLayout] = useState('grid');
+  const [layout, setLayout] = useState("grid");
   const [reactions, setReactions] = useState([]);
 
   // ── New feature panels ───────────────────────────────────────────────────────
@@ -105,38 +115,47 @@ export default function Room() {
         pipDismissedRef.current = false;
       }
     };
-    document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, [docPipWindow]);
 
   useEffect(() => {
     const onKicked = () => setKicked(true);
-    window.addEventListener('qm-kicked', onKicked);
-    return () => window.removeEventListener('qm-kicked', onKicked);
+    window.addEventListener("qm-kicked", onKicked);
+    return () => window.removeEventListener("qm-kicked", onKicked);
   }, []);
 
   // Classroom session lookup — safe because isHost/nameConfirmed already declared
   useEffect(() => {
     if (!classroomId || !isHost || !nameConfirmed) return;
     fetch(`${API}/api/classrooms/${classroomId}/sessions`)
-      .then(r => r.json())
-      .then(sessions => {
+      .then((r) => r.json())
+      .then((sessions) => {
         if (!Array.isArray(sessions)) return;
-        const active = sessions.find(s => s.roomId === roomId && !s.endedAt);
+        const active = sessions.find((s) => s.roomId === roomId && !s.endedAt);
         if (active) sessionIdRef.current = active._id;
-      }).catch(() => { });
+      })
+      .catch(() => {});
   }, [classroomId, isHost, nameConfirmed]);
 
   const saveSessionData = useCallback(async () => {
     if (!classroomId || !sessionIdRef.current) return;
-    const chatPayload = messages.map(m => ({
-      userName: m.userName, message: m.message, timestamp: m.timestamp,
+    const chatPayload = messages.map((m) => ({
+      userName: m.userName,
+      message: m.message,
+      timestamp: m.timestamp,
     }));
-    await fetch(`${API}/api/classrooms/${classroomId}/sessions/${sessionIdRef.current}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endedAt: new Date().toISOString(), chatLog: chatPayload }),
-    }).catch(() => { });
+    await fetch(
+      `${API}/api/classrooms/${classroomId}/sessions/${sessionIdRef.current}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endedAt: new Date().toISOString(),
+          chatLog: chatPayload,
+        }),
+      },
+    ).catch(() => {});
   }, [classroomId, messages]);
 
   // ── Sounds ───────────────────────────────────────────────────────────────────
@@ -145,53 +164,92 @@ export default function Room() {
   // ── Socket init ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!nameConfirmed) return;
-    const s = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    const s = io(SOCKET_URL, { transports: ["websocket", "polling"] });
     socketRef.current = s;
     setSocket(s);
 
-    s.on('chat-message', msg => {
-      setMessages(p => [...p, msg]);
-      setChatOpen(prev => { if (!prev) setUnread(u => u + 1); return prev; });
+    s.on("chat-message", (msg) => {
+      setMessages((p) => [...p, msg]);
+      setChatOpen((prev) => {
+        if (!prev) setUnread((u) => u + 1);
+        return prev;
+      });
       playMessage();
     });
-    s.on('knock-request', ({ socketId, userName: kName }) => {
-      setKnockRequests(p => [...p, { socketId, userName: kName }]);
+    s.on("knock-request", ({ socketId, userName: kName }) => {
+      setKnockRequests((p) => [...p, { socketId, userName: kName }]);
       playKnock();
     });
-    s.on('knock-accepted', () => { setKnockStatus('accepted'); playJoin(); });
-    s.on('knock-rejected', () => { setKnockStatus('rejected'); playKnock(); });
+    s.on("knock-accepted", () => {
+      setKnockStatus("accepted");
+      playJoin();
+    });
+    s.on("knock-rejected", () => {
+      setKnockStatus("rejected");
+      playKnock();
+    });
 
     // Host controls
-    s.on('force-mute', () => window.dispatchEvent(new Event('qm-force-mute')));
-    s.on('force-unmute', () => window.dispatchEvent(new Event('qm-force-unmute')));
-    s.on('force-stop-video', () => window.dispatchEvent(new Event('qm-force-stop-video')));
-    s.on('wb-permission', ({ allowed }) => setWbAllowed(allowed));
-    s.on('lower-hand', () => setHandRaised(false));
+    s.on("force-mute", () => window.dispatchEvent(new Event("qm-force-mute")));
+    s.on("force-unmute", () =>
+      window.dispatchEvent(new Event("qm-force-unmute")),
+    );
+    s.on("force-stop-video", () =>
+      window.dispatchEvent(new Event("qm-force-stop-video")),
+    );
+    s.on("wb-permission", ({ allowed }) => setWbAllowed(allowed));
+    s.on("lower-hand", () => setHandRaised(false));
 
     // Reactions from peers
-    s.on('peer-reaction', ({ emoji, x, y }) => spawnReaction(emoji, x, y));
+    s.on("peer-reaction", ({ emoji, x, y }) => spawnReaction(emoji, x, y));
 
     // Peer state
-    s.on('peer-audio-toggle', ({ socketId, enabled }) =>
-      setPeerMeta(m => ({ ...m, [socketId]: { ...m[socketId], audioMuted: !enabled } })));
-    s.on('peer-video-toggle', ({ socketId, enabled }) =>
-      setPeerMeta(m => ({ ...m, [socketId]: { ...m[socketId], videoStopped: !enabled } })));
-    s.on('peer-hand-raise', ({ socketId, userName: n }) =>
-      setPeerMeta(m => ({ ...m, [socketId]: { ...m[socketId], handRaised: true, userName: n } })));
-    s.on('peer-hand-lower', ({ socketId }) =>
-      setPeerMeta(m => ({ ...m, [socketId]: { ...m[socketId], handRaised: false } })));
-    s.on('user-joined', () => playJoin());
-    s.on('user-left', ({ socketId }) => {
+    s.on("peer-audio-toggle", ({ socketId, enabled }) =>
+      setPeerMeta((m) => ({
+        ...m,
+        [socketId]: { ...m[socketId], audioMuted: !enabled },
+      })),
+    );
+    s.on("peer-video-toggle", ({ socketId, enabled }) =>
+      setPeerMeta((m) => ({
+        ...m,
+        [socketId]: { ...m[socketId], videoStopped: !enabled },
+      })),
+    );
+    s.on("peer-hand-raise", ({ socketId, userName: n }) =>
+      setPeerMeta((m) => ({
+        ...m,
+        [socketId]: { ...m[socketId], handRaised: true, userName: n },
+      })),
+    );
+    s.on("peer-hand-lower", ({ socketId }) =>
+      setPeerMeta((m) => ({
+        ...m,
+        [socketId]: { ...m[socketId], handRaised: false },
+      })),
+    );
+    s.on("user-joined", () => playJoin());
+    s.on("user-left", ({ socketId }) => {
       playLeave();
-      setPeerMeta(m => { const n = { ...m }; delete n[socketId]; return n; });
+      setPeerMeta((m) => {
+        const n = { ...m };
+        delete n[socketId];
+        return n;
+      });
     });
 
     // Transcription permission
-    s.on('transcribe-permission', ({ allowed }) => setTranscribePermitted(allowed));
+    s.on("transcribe-permission", ({ allowed }) =>
+      setTranscribePermitted(allowed),
+    );
 
     // Poll/QnA badges when panels are closed
-    s.on('poll-new', () => { setPollBadge(b => b + 1); });
-    s.on('qna-new', () => { setQnaBadge(b => b + 1); });
+    s.on("poll-new", () => {
+      setPollBadge((b) => b + 1);
+    });
+    s.on("qna-new", () => {
+      setQnaBadge((b) => b + 1);
+    });
 
     return () => s.disconnect();
   }, [nameConfirmed, playJoin, playLeave, playMessage, playKnock]);
@@ -200,33 +258,52 @@ export default function Room() {
   useEffect(() => {
     if (!nameConfirmed) return;
     fetch(`${API}/api/rooms/${roomId}`)
-      .then(r => r.json()).then(setRoomInfo)
+      .then((r) => r.json())
+      .then(setRoomInfo)
       .catch(() => setRoomInfo({ isPublic: true }));
   }, [roomId, nameConfirmed]);
 
   // ── WebRTC ────────────────────────────────────────────────────────────────────
-  const { localStream, screenStream, peers, audioEnabled, videoEnabled, screenSharing,
-    initLocalStream, toggleAudio, toggleVideo, toggleScreenShare, cleanup,
+  const {
+    localStream,
+    screenStream,
+    peers,
+    audioEnabled,
+    videoEnabled,
+    screenSharing,
+    initLocalStream,
+    toggleAudio,
+    toggleVideo,
+    toggleScreenShare,
+    cleanup,
   } = useWebRTC({ socket, roomId, userId, userName });
 
   // ── Meeting recorder (admin only) ─────────────────────────────────────────
-  const { recording, duration, startRecording, stopRecording } = useMeetingRecorder({ localStream, peers });
+  const { recording, duration, startRecording, stopRecording } =
+    useMeetingRecorder({ localStream, peers });
   const handleRecord = useCallback(() => {
-    if (recording) stopRecording(); else startRecording();
+    if (recording) stopRecording();
+    else startRecording();
   }, [recording, startRecording, stopRecording]);
 
   // ── Host force controls ───────────────────────────────────────────────────────
   useEffect(() => {
-    const onFM = () => { if (audioEnabled) toggleAudio(); };
-    const onFU = () => { if (!audioEnabled) toggleAudio(); };
-    const onFSV = () => { if (videoEnabled) toggleVideo(); };
-    window.addEventListener('qm-force-mute', onFM);
-    window.addEventListener('qm-force-unmute', onFU);
-    window.addEventListener('qm-force-stop-video', onFSV);
+    const onFM = () => {
+      if (audioEnabled) toggleAudio();
+    };
+    const onFU = () => {
+      if (!audioEnabled) toggleAudio();
+    };
+    const onFSV = () => {
+      if (videoEnabled) toggleVideo();
+    };
+    window.addEventListener("qm-force-mute", onFM);
+    window.addEventListener("qm-force-unmute", onFU);
+    window.addEventListener("qm-force-stop-video", onFSV);
     return () => {
-      window.removeEventListener('qm-force-mute', onFM);
-      window.removeEventListener('qm-force-unmute', onFU);
-      window.removeEventListener('qm-force-stop-video', onFSV);
+      window.removeEventListener("qm-force-mute", onFM);
+      window.removeEventListener("qm-force-unmute", onFU);
+      window.removeEventListener("qm-force-stop-video", onFSV);
     };
   }, [audioEnabled, videoEnabled, toggleAudio, toggleVideo]);
 
@@ -236,43 +313,58 @@ export default function Room() {
     const doJoin = async () => {
       await initLocalStream();
       if (isHost || roomInfo.isPublic) {
-        socket.emit('join-room', { roomId, userId, userName, isHost });
+        socket.emit("join-room", { roomId, userId, userName, isHost });
         hasJoined.current = true;
       } else {
-        setKnockStatus('knocking');
-        socket.emit('knock', { roomId, userId, userName });
+        setKnockStatus("knocking");
+        socket.emit("knock", { roomId, userId, userName });
       }
     };
     doJoin();
   }, [socket, roomInfo, nameConfirmed]);
 
   useEffect(() => {
-    if (knockStatus !== 'accepted' || hasJoined.current || !socket) return;
-    socket.emit('join-room', { roomId, userId, userName, isHost: false });
+    if (knockStatus !== "accepted" || hasJoined.current || !socket) return;
+    socket.emit("join-room", { roomId, userId, userName, isHost: false });
     hasJoined.current = true;
     setKnockStatus(null);
   }, [knockStatus, socket]);
 
   // ── Auto-unpin departed peer ──────────────────────────────────────────────────
   useEffect(() => {
-    if (pinnedId && pinnedId !== 'local' && !peers.some(p => p.socketId === pinnedId))
+    if (
+      pinnedId &&
+      pinnedId !== "local" &&
+      !peers.some((p) => p.socketId === pinnedId)
+    )
       setPinnedId(null);
   }, [peers, pinnedId]);
 
   // ── Reactions helper ─────────────────────────────────────────────────────────
   const spawnReaction = useCallback((emoji, x, y) => {
     const id = crypto.randomUUID();
-    setReactions(r => [...r, { id, emoji, x: x ?? Math.random() * 80 + 10, y: y ?? Math.random() * 60 + 20 }]);
-    setTimeout(() => setReactions(r => r.filter(rx => rx.id !== id)), 3000);
+    setReactions((r) => [
+      ...r,
+      {
+        id,
+        emoji,
+        x: x ?? Math.random() * 80 + 10,
+        y: y ?? Math.random() * 60 + 20,
+      },
+    ]);
+    setTimeout(() => setReactions((r) => r.filter((rx) => rx.id !== id)), 3000);
   }, []);
 
-  const sendReaction = useCallback((emoji) => {
-    const x = Math.random() * 80 + 10;
-    const y = Math.random() * 60 + 20;
-    spawnReaction(emoji, x, y);
-    socketRef.current?.emit('room-reaction', { roomId, emoji, x, y });
-    setReactionOpen(false);
-  }, [roomId, spawnReaction]);
+  const sendReaction = useCallback(
+    (emoji) => {
+      const x = Math.random() * 80 + 10;
+      const y = Math.random() * 60 + 20;
+      spawnReaction(emoji, x, y);
+      socketRef.current?.emit("room-reaction", { roomId, emoji, x, y });
+      setReactionOpen(false);
+    },
+    [roomId, spawnReaction],
+  );
 
   // ── Leave ─────────────────────────────────────────────────────────────────────
   const handleLeave = useCallback(async () => {
@@ -280,19 +372,39 @@ export default function Room() {
     cleanup();
     socketRef.current?.disconnect();
     localStorage.removeItem(`qm_host_${roomId}`);
-    navigate(classroomId ? `/classroom/${classroomId}` : '/');
+    navigate(classroomId ? `/classroom/${classroomId}` : "/");
   }, [saveSessionData, cleanup, roomId, classroomId]);
 
-  const handlePin = useCallback(sid => setPinnedId(p => p === sid ? null : sid), []);
-  const handleKickUser = useCallback(sid => socketRef.current?.emit('kick-user', { roomId, targetSocketId: sid }), [roomId]);
-  const admitUser = sid => { socketRef.current?.emit('admit-user', { roomId, socketId: sid }); setKnockRequests(p => p.filter(k => k.socketId !== sid)); };
-  const rejectUser = sid => { socketRef.current?.emit('reject-user', { roomId, socketId: sid }); setKnockRequests(p => p.filter(k => k.socketId !== sid)); };
-  const handleCopyLink = () => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const handlePin = useCallback(
+    (sid) => setPinnedId((p) => (p === sid ? null : sid)),
+    [],
+  );
+  const handleKickUser = useCallback(
+    (sid) =>
+      socketRef.current?.emit("kick-user", { roomId, targetSocketId: sid }),
+    [roomId],
+  );
+  const admitUser = (sid) => {
+    socketRef.current?.emit("admit-user", { roomId, socketId: sid });
+    setKnockRequests((p) => p.filter((k) => k.socketId !== sid));
+  };
+  const rejectUser = (sid) => {
+    socketRef.current?.emit("reject-user", { roomId, socketId: sid });
+    setKnockRequests((p) => p.filter((k) => k.socketId !== sid));
+  };
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-  const sendMessage = useCallback(text => {
-    if (!socket || !text.trim()) return;
-    socket.emit('chat-message', { roomId, message: text, userName, userId });
-  }, [socket, roomId, userName, userId]);
+  const sendMessage = useCallback(
+    (text) => {
+      if (!socket || !text.trim()) return;
+      socket.emit("chat-message", { roomId, message: text, userName, userId });
+    },
+    [socket, roomId, userName, userId],
+  );
 
   const handleToggleDocPip = async () => {
     if (docPipWindow) {
@@ -300,8 +412,10 @@ export default function Room() {
       return;
     }
 
-    if (!('documentPictureInPicture' in window)) {
-      alert("Document Picture-in-Picture API is not supported in your browser.");
+    if (!("documentPictureInPicture" in window)) {
+      alert(
+        "Document Picture-in-Picture API is not supported in your browser.",
+      );
       return;
     }
 
@@ -314,13 +428,15 @@ export default function Room() {
       // Copy styles
       [...document.styleSheets].forEach((styleSheet) => {
         try {
-          const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
-          const style = document.createElement('style');
+          const cssRules = [...styleSheet.cssRules]
+            .map((rule) => rule.cssText)
+            .join("");
+          const style = document.createElement("style");
           style.textContent = cssRules;
           pipWin.document.head.appendChild(style);
         } catch (e) {
-          const link = document.createElement('link');
-          link.rel = 'stylesheet';
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
           link.type = styleSheet.type;
           link.media = styleSheet.media;
           link.href = styleSheet.href;
@@ -328,38 +444,42 @@ export default function Room() {
         }
       });
 
-      pipWin.document.body.style.margin = '0';
-      pipWin.document.body.style.padding = '0';
-      pipWin.document.body.style.backgroundColor = '#1e1e1e';
-      pipWin.document.body.style.color = '#ffffff';
-      pipWin.document.body.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-      pipWin.document.body.style.overflow = 'hidden';
+      pipWin.document.body.style.margin = "0";
+      pipWin.document.body.style.padding = "0";
+      pipWin.document.body.style.backgroundColor = "#1e1e1e";
+      pipWin.document.body.style.color = "#ffffff";
+      pipWin.document.body.style.fontFamily =
+        "system-ui, -apple-system, sans-serif";
+      pipWin.document.body.style.overflow = "hidden";
 
-      pipWin.addEventListener('pagehide', () => {
+      pipWin.addEventListener("pagehide", () => {
         setDocPipWindow(null);
       });
 
       setDocPipWindow(pipWin);
     } catch (err) {
-      console.error('Failed to open Document PiP:', err);
+      console.error("Failed to open Document PiP:", err);
     }
   };
 
   const handleToggleChat = useCallback(() => {
-    setChatOpen(prev => { if (!prev) setUnread(0); return !prev; });
+    setChatOpen((prev) => {
+      if (!prev) setUnread(0);
+      return !prev;
+    });
   }, []);
 
   const handleRaiseHand = useCallback(() => {
-    setHandRaised(prev => {
+    setHandRaised((prev) => {
       const next = !prev;
-      if (next) socketRef.current?.emit('raise-hand', { roomId, userName });
-      else socketRef.current?.emit('lower-hand', { roomId });
+      if (next) socketRef.current?.emit("raise-hand", { roomId, userName });
+      else socketRef.current?.emit("lower-hand", { roomId });
       return next;
     });
   }, [roomId, userName]);
 
   // ── Enriched peers ────────────────────────────────────────────────────────────
-  const enrichedPeers = peers.map(p => ({
+  const enrichedPeers = peers.map((p) => ({
     ...p,
     audioMuted: peerMeta[p.socketId]?.audioMuted || false,
     videoStopped: peerMeta[p.socketId]?.videoStopped || false,
@@ -367,61 +487,129 @@ export default function Room() {
   }));
 
   // ── Wait screens ──────────────────────────────────────────────────────────────
-  if (!nameConfirmed) return (
-    <div className={styles.waitScreen}><div className={styles.waitCard}>
-      <div className={styles.waitLogo}><img src="/logo.png" alt="QuantumMeet" className={styles.waitLogoImage} /> QuantumMeet</div>
-      <h2>What's your name?</h2>
-      <p>Enter your display name to join this meeting.</p>
-      <input className={styles.waitInput} type="text" placeholder="Your name"
-        value={nameInput} autoFocus
-        onChange={e => { setNameInput(e.target.value); setNameError(''); }}
-        onKeyDown={e => e.key === 'Enter' && confirmName()} />
-      {nameError && <p className={styles.waitError}>{nameError}</p>}
-      <button className={styles.waitJoinBtn} onClick={confirmName}>Join Meeting →</button>
-      <button className={styles.waitLeave} onClick={() => navigate('/')}>← Back</button>
-    </div></div>
-  );
+  if (!nameConfirmed)
+    return (
+      <div className={styles.waitScreen}>
+        <div className={styles.waitCard}>
+          <div className={styles.waitLogo}>
+            <img
+              src="/logo.png"
+              alt="QuantumMeet"
+              className={styles.waitLogoImage}
+            />{" "}
+            QuantumMeet
+          </div>
+          <h2>What's your name?</h2>
+          <p>Enter your display name to join this meeting.</p>
+          <input
+            className={styles.waitInput}
+            type="text"
+            placeholder="Your name"
+            value={nameInput}
+            autoFocus
+            onChange={(e) => {
+              setNameInput(e.target.value);
+              setNameError("");
+            }}
+            onKeyDown={(e) => e.key === "Enter" && confirmName()}
+          />
+          {nameError && <p className={styles.waitError}>{nameError}</p>}
+          <button className={styles.waitJoinBtn} onClick={confirmName}>
+            Join Meeting →
+          </button>
+          <button className={styles.waitLeave} onClick={() => navigate("/")}>
+            ← Back
+          </button>
+        </div>
+      </div>
+    );
 
-  if (kicked) return (
-    <div className={styles.waitScreen}><div className={styles.waitCard}>
-      <span style={{ fontSize: 48 }}>🚫</span>
-      <h2>You were removed</h2>
-      <p>The host removed you from this meeting.</p>
-      <button className={styles.waitJoinBtn} onClick={() => navigate('/')}>Go home</button>
-    </div></div>
-  );
+  if (kicked)
+    return (
+      <div className={styles.waitScreen}>
+        <div className={styles.waitCard}>
+          <span style={{ fontSize: 48 }}>🚫</span>
+          <h2>You were removed</h2>
+          <p>The host removed you from this meeting.</p>
+          <button className={styles.waitJoinBtn} onClick={() => navigate("/")}>
+            Go home
+          </button>
+        </div>
+      </div>
+    );
 
-  if (knockStatus === 'knocking') return (
-    <div className={styles.waitScreen}><div className={styles.waitCard}>
-      <div className={styles.waitSpinner} />
-      <h2>Waiting to be admitted</h2>
-      <p>The host will let you in shortly.</p>
-      <code className={styles.waitRoom}>{roomId}</code>
-      <button className={styles.waitLeave} onClick={() => navigate('/')}>Cancel</button>
-    </div></div>
-  );
+  if (knockStatus === "knocking")
+    return (
+      <div className={styles.waitScreen}>
+        <div className={styles.waitCard}>
+          <div className={styles.waitSpinner} />
+          <h2>Waiting to be admitted</h2>
+          <p>The host will let you in shortly.</p>
+          <code className={styles.waitRoom}>{roomId}</code>
+          <button className={styles.waitLeave} onClick={() => navigate("/")}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
 
-  if (knockStatus === 'rejected') return (
-    <div className={styles.waitScreen}><div className={styles.waitCard}>
-      <span style={{ fontSize: 48 }}>🚫</span>
-      <h2>Entry denied</h2>
-      <p>The host declined your request.</p>
-      <button className={styles.waitLeave} onClick={() => navigate('/')}>Go back</button>
-    </div></div>
-  );
+  if (knockStatus === "rejected")
+    return (
+      <div className={styles.waitScreen}>
+        <div className={styles.waitCard}>
+          <span style={{ fontSize: 48 }}>🚫</span>
+          <h2>Entry denied</h2>
+          <p>The host declined your request.</p>
+          <button className={styles.waitLeave} onClick={() => navigate("/")}>
+            Go back
+          </button>
+        </div>
+      </div>
+    );
 
   // ── Layout helpers ────────────────────────────────────────────────────────────
   // Build participant list.
   // When screen sharing, add a dedicated screen tile AFTER the local camera tile.
   const allParticipants = [
-    { socketId: 'local', userName, stream: localStream, isLocal: true, isScreen: false },
+    {
+      socketId: "local",
+      userName,
+      stream: localStream,
+      isLocal: true,
+      isScreen: false,
+    },
     ...(screenSharing && screenStream
-      ? [{ socketId: 'screen-local', userName: userName + "'s screen", stream: screenStream, isLocal: false, isScreen: true }]
+      ? [
+          {
+            socketId: "screen-local",
+            userName: userName + "'s screen",
+            stream: screenStream,
+            isLocal: false,
+            isScreen: true,
+          },
+        ]
       : []),
-    ...peers.map(p => ({ ...p, isLocal: false, isScreen: false })),
+    ...peers.flatMap((p) => [
+      { ...p, isLocal: false, isScreen: false },
+      ...(p.screenStream
+        ? [
+            {
+              socketId: `screen-${p.socketId}`,
+              userName: p.userName + "'s screen",
+              stream: p.screenStream,
+              isLocal: false,
+              isScreen: true,
+            },
+          ]
+        : []),
+    ]),
   ];
-  const pinnedP = pinnedId ? allParticipants.find(p => p.socketId === pinnedId) : null;
-  const others = pinnedP ? allParticipants.filter(p => p.socketId !== pinnedId) : allParticipants;
+  const pinnedP = pinnedId
+    ? allParticipants.find((p) => p.socketId === pinnedId)
+    : null;
+  const others = pinnedP
+    ? allParticipants.filter((p) => p.socketId !== pinnedId)
+    : allParticipants;
   const n = allParticipants.length;
   // Responsive grid: tiles fill available space cleanly for every count
   const gridClass = (() => {
@@ -429,34 +617,36 @@ export default function Room() {
     if (n === 2) return styles.grid2;
     if (n === 3) return styles.grid3;
     if (n === 4) return styles.grid4;
-    if (n <= 6)  return styles.grid6;
+    if (n <= 6) return styles.grid6;
     return styles.gridMany;
   })();
-  const raisedHands = enrichedPeers.filter(p => p.handRaised);
+  const raisedHands = enrichedPeers.filter((p) => p.handRaised);
 
   // ── Main render ───────────────────────────────────────────────────────────────
 
   // Helper: get correct audio/video enabled state for any participant tile
   const tileAudio = (p) => {
     if (p.isLocal) return audioEnabled;
-    if (p.isScreen) return true;            // screen tile has no audio
+    if (p.isScreen) return true; // screen tile has no audio
     const meta = peerMeta[p.socketId];
     return meta ? !meta.audioMuted : true;
   };
   const tileVideo = (p) => {
     if (p.isLocal) return videoEnabled;
-    if (p.isScreen) return true;            // screen share is always "video on"
+    if (p.isScreen) return true; // screen share is always "video on"
     const meta = peerMeta[p.socketId];
     return meta ? !meta.videoStopped : true;
   };
 
   return (
     <div className={styles.room}>
-
       {/* Floating emoji reactions */}
-      {reactions.map(r => (
-        <div key={r.id} className={styles.reaction}
-          style={{ left: `${r.x}%`, top: `${r.y}%` }}>
+      {reactions.map((r) => (
+        <div
+          key={r.id}
+          className={styles.reaction}
+          style={{ left: `${r.x}%`, top: `${r.y}%` }}
+        >
           {r.emoji}
         </div>
       ))}
@@ -464,27 +654,47 @@ export default function Room() {
       {/* ── Topbar ── */}
       <div className={styles.topbar}>
         <div className={styles.logo}>
-          <img src="/logo.png" alt="QuantumMeet" className={styles.logoIconImage} />
-          <span>Quantum<strong>Meet</strong></span>
-          {classroomId && <span className={styles.classroomPill}>🎓 Class</span>}
+          <img
+            src="/logo.png"
+            alt="QuantumMeet"
+            className={styles.logoIconImage}
+          />
+          <span>
+            Quantum<strong>Meet</strong>
+          </span>
+          {classroomId && (
+            <span className={styles.classroomPill}>🎓 Class</span>
+          )}
         </div>
         <div className={styles.roomInfo}>
-          {roomInfo?.isPublic
-            ? <span className={styles.publicPill}>🌐 Public</span>
-            : roomInfo && <span className={styles.privatePill}>🔒 Private</span>}
+          {roomInfo?.isPublic ? (
+            <span className={styles.publicPill}>🌐 Public</span>
+          ) : (
+            roomInfo && <span className={styles.privatePill}>🔒 Private</span>
+          )}
           <span className={styles.roomId}>{roomId}</span>
           <button className={styles.copyBtn} onClick={handleCopyLink}>
-            {copied ? '✓ Copied' : '⎘ Copy'}
+            {copied ? "✓ Copied" : "⎘ Copy"}
           </button>
           {isHost && <span className={styles.hostPill}>👑 Host</span>}
         </div>
         <div className={styles.topRight}>
           {/* Layout switcher */}
           <div className={styles.layoutSwitch}>
-            {[['grid', '⊞'], ['spotlight', '◉'], ['sidebar', '⊡']].map(([l, icon]) => (
-              <button key={l}
-                className={`${styles.layoutBtn} ${layout === l ? styles.layoutBtnActive : ''}`}
-                onClick={() => { setLayout(l); setPinnedId(null); }} title={l}>
+            {[
+              ["grid", "⊞"],
+              ["spotlight", "◉"],
+              ["sidebar", "⊡"],
+            ].map(([l, icon]) => (
+              <button
+                key={l}
+                className={`${styles.layoutBtn} ${layout === l ? styles.layoutBtnActive : ""}`}
+                onClick={() => {
+                  setLayout(l);
+                  setPinnedId(null);
+                }}
+                title={l}
+              >
                 {icon}
               </button>
             ))}
@@ -492,12 +702,20 @@ export default function Room() {
           {recording && (
             <span className={styles.recBadge}>
               <span className={styles.recDot} />
-              {String(Math.floor(duration / 60)).padStart(2, '0')}:{String(duration % 60).padStart(2, '0')}
+              {String(Math.floor(duration / 60)).padStart(2, "0")}:
+              {String(duration % 60).padStart(2, "0")}
             </span>
           )}
           <div className={styles.liveDot} />
           <span className={styles.participantCount}>{n} in call</span>
-          {pinnedId && <button className={styles.unpinAllBtn} onClick={() => setPinnedId(null)}>📌 Unpin</button>}
+          {pinnedId && (
+            <button
+              className={styles.unpinAllBtn}
+              onClick={() => setPinnedId(null)}
+            >
+              📌 Unpin
+            </button>
+          )}
           {handRaised && <span className={styles.handBadge}>✋</span>}
         </div>
       </div>
@@ -505,7 +723,7 @@ export default function Room() {
       {/* ── Raised hand toasts ── */}
       {raisedHands.length > 0 && (
         <div className={styles.handNotifications}>
-          {raisedHands.map(p => (
+          {raisedHands.map((p) => (
             <div key={p.socketId} className={styles.handNote}>
               ✋ <strong>{p.userName}</strong> raised their hand
             </div>
@@ -516,12 +734,24 @@ export default function Room() {
       {/* ── Knock requests (host) ── */}
       {isHost && knockRequests.length > 0 && (
         <div className={styles.knockPanel}>
-          {knockRequests.map(k => (
+          {knockRequests.map((k) => (
             <div key={k.socketId} className={styles.knockItem}>
-              <span>🔔 <strong>{k.userName}</strong> wants to join</span>
+              <span>
+                🔔 <strong>{k.userName}</strong> wants to join
+              </span>
               <div className={styles.knockBtns}>
-                <button className={styles.admitBtn} onClick={() => admitUser(k.socketId)}>Admit</button>
-                <button className={styles.rejectBtn} onClick={() => rejectUser(k.socketId)}>Deny</button>
+                <button
+                  className={styles.admitBtn}
+                  onClick={() => admitUser(k.socketId)}
+                >
+                  Admit
+                </button>
+                <button
+                  className={styles.rejectBtn}
+                  onClick={() => rejectUser(k.socketId)}
+                >
+                  Deny
+                </button>
               </div>
             </div>
           ))}
@@ -529,74 +759,131 @@ export default function Room() {
       )}
 
       {/* ── Video area ── */}
-      {layout === 'spotlight' && allParticipants.length > 0 ? (
+      {layout === "spotlight" && allParticipants.length > 0 ? (
         // Spotlight: biggest tile top, strip below
         <div className={styles.spotlightLayout}>
           <div className={styles.spotlightMain}>
             {(() => {
-              const sp = pinnedP || allParticipants[0]; return (
-                <VideoTile stream={sp.stream} userName={sp.userName} isLocal={sp.isLocal} isScreen={sp.isScreen || false}
+              const sp = pinnedP || allParticipants[0];
+              return (
+                <VideoTile
+                  stream={sp.stream}
+                  userName={sp.userName}
+                  isLocal={sp.isLocal}
+                  isScreen={sp.isScreen || false}
                   audioEnabled={tileAudio(sp)}
                   videoEnabled={tileVideo(sp)}
-                  isPinned={!!pinnedP} onPin={() => handlePin(sp.socketId)}
-                  isHost={isHost} onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)} />
+                  isPinned={!!pinnedP}
+                  onPin={() => handlePin(sp.socketId)}
+                  isHost={isHost}
+                  onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)}
+                />
               );
             })()}
           </div>
           <div className={styles.spotlightStrip}>
-            {allParticipants.slice(pinnedP ? 0 : 1).filter(p => p.socketId !== (pinnedP?.socketId)).map(p => (
-              <div key={p.socketId} className={styles.stripTile}>
-                <VideoTile stream={p.stream} userName={p.userName} isLocal={p.isLocal} isScreen={p.isScreen || false}
-                  audioEnabled={tileAudio(p)}
-                  videoEnabled={tileVideo(p)}
-                  isPinned={pinnedId === p.socketId} onPin={() => handlePin(p.socketId)}
-                  isHost={isHost} onKick={p.isLocal ? null : () => handleKickUser(p.socketId)} />
-              </div>
-            ))}
+            {allParticipants
+              .slice(pinnedP ? 0 : 1)
+              .filter((p) => p.socketId !== pinnedP?.socketId)
+              .map((p) => (
+                <div key={p.socketId} className={styles.stripTile}>
+                  <VideoTile
+                    stream={p.stream}
+                    userName={p.userName}
+                    isLocal={p.isLocal}
+                    isScreen={p.isScreen || false}
+                    audioEnabled={tileAudio(p)}
+                    videoEnabled={tileVideo(p)}
+                    isPinned={pinnedId === p.socketId}
+                    onPin={() => handlePin(p.socketId)}
+                    isHost={isHost}
+                    onKick={p.isLocal ? null : () => handleKickUser(p.socketId)}
+                  />
+                </div>
+              ))}
           </div>
         </div>
-      ) : layout === 'sidebar' ? (
+      ) : layout === "sidebar" ? (
         // Sidebar: main + right sidebar
         <div className={styles.pinnedLayout}>
           <div className={styles.pinnedMain}>
             {(() => {
-              const sp = pinnedP || allParticipants[0]; return (
-                <VideoTile stream={sp.stream} userName={sp.userName} isLocal={sp.isLocal} isScreen={sp.isScreen || false}
+              const sp = pinnedP || allParticipants[0];
+              return (
+                <VideoTile
+                  stream={sp.stream}
+                  userName={sp.userName}
+                  isLocal={sp.isLocal}
+                  isScreen={sp.isScreen || false}
                   audioEnabled={tileAudio(sp)}
                   videoEnabled={tileVideo(sp)}
-                  isPinned={!!pinnedP} onPin={() => handlePin(sp.socketId)}
-                  isHost={isHost} onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)} />
+                  isPinned={!!pinnedP}
+                  onPin={() => handlePin(sp.socketId)}
+                  isHost={isHost}
+                  onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)}
+                />
               );
             })()}
           </div>
           <div className={styles.pinnedSidebar}>
-            {allParticipants.filter(p => p.socketId !== (pinnedP?.socketId || allParticipants[0]?.socketId)).map(p => (
-              <VideoTile key={p.socketId} stream={p.stream} userName={p.userName} isLocal={p.isLocal} isScreen={p.isScreen || false}
-                audioEnabled={tileAudio(p)}
-                videoEnabled={tileVideo(p)}
-                isPinned={pinnedId === p.socketId} onPin={() => handlePin(p.socketId)}
-                isHost={isHost} onKick={p.isLocal ? null : () => handleKickUser(p.socketId)} />
-            ))}
+            {allParticipants
+              .filter(
+                (p) =>
+                  p.socketId !==
+                  (pinnedP?.socketId || allParticipants[0]?.socketId),
+              )
+              .map((p) => (
+                <VideoTile
+                  key={p.socketId}
+                  stream={p.stream}
+                  userName={p.userName}
+                  isLocal={p.isLocal}
+                  isScreen={p.isScreen || false}
+                  audioEnabled={tileAudio(p)}
+                  videoEnabled={tileVideo(p)}
+                  isPinned={pinnedId === p.socketId}
+                  onPin={() => handlePin(p.socketId)}
+                  isHost={isHost}
+                  onKick={p.isLocal ? null : () => handleKickUser(p.socketId)}
+                />
+              ))}
           </div>
         </div>
       ) : pinnedP ? (
         // Pinned tile layout
         <div className={styles.pinnedLayout}>
           <div className={styles.pinnedMain}>
-            <VideoTile stream={pinnedP.stream} userName={pinnedP.userName} isLocal={pinnedP.isLocal} isScreen={pinnedP.isScreen || false}
+            <VideoTile
+              stream={pinnedP.stream}
+              userName={pinnedP.userName}
+              isLocal={pinnedP.isLocal}
+              isScreen={pinnedP.isScreen || false}
               audioEnabled={tileAudio(pinnedP)}
               videoEnabled={tileVideo(pinnedP)}
-              isPinned onPin={() => handlePin(pinnedP.socketId)}
-              isHost={isHost} onKick={pinnedP.isLocal ? null : () => handleKickUser(pinnedP.socketId)} />
+              isPinned
+              onPin={() => handlePin(pinnedP.socketId)}
+              isHost={isHost}
+              onKick={
+                pinnedP.isLocal ? null : () => handleKickUser(pinnedP.socketId)
+              }
+            />
           </div>
           {others.length > 0 && (
             <div className={styles.pinnedSidebar}>
-              {others.map(p => (
-                <VideoTile key={p.socketId} stream={p.stream} userName={p.userName} isLocal={p.isLocal} isScreen={p.isScreen || false}
+              {others.map((p) => (
+                <VideoTile
+                  key={p.socketId}
+                  stream={p.stream}
+                  userName={p.userName}
+                  isLocal={p.isLocal}
+                  isScreen={p.isScreen || false}
                   audioEnabled={tileAudio(p)}
                   videoEnabled={tileVideo(p)}
-                  isPinned={false} onPin={() => handlePin(p.socketId)}
-                  isHost={isHost} onKick={p.isLocal ? null : () => handleKickUser(p.socketId)} />
+                  isPinned={false}
+                  onPin={() => handlePin(p.socketId)}
+                  isHost={isHost}
+                  onKick={p.isLocal ? null : () => handleKickUser(p.socketId)}
+                />
               ))}
             </div>
           )}
@@ -604,22 +891,34 @@ export default function Room() {
       ) : (
         // Default grid
         <div className={`${styles.videoGrid} ${gridClass}`}>
-          {allParticipants.map(p => (
-            <VideoTile key={p.socketId} stream={p.stream} userName={p.userName} isLocal={p.isLocal} isScreen={p.isScreen || false}
+          {allParticipants.map((p) => (
+            <VideoTile
+              key={p.socketId}
+              stream={p.stream}
+              userName={p.userName}
+              isLocal={p.isLocal}
+              isScreen={p.isScreen || false}
               audioEnabled={tileAudio(p)}
               videoEnabled={tileVideo(p)}
-              isPinned={pinnedId === p.socketId} onPin={() => handlePin(p.socketId)}
-              isHost={isHost} onKick={p.isLocal ? null : () => handleKickUser(p.socketId)} />
+              isPinned={pinnedId === p.socketId}
+              onPin={() => handlePin(p.socketId)}
+              isHost={isHost}
+              onKick={p.isLocal ? null : () => handleKickUser(p.socketId)}
+            />
           ))}
         </div>
       )}
 
       {/* ── Controls bar ── */}
       <Controls
-        audioEnabled={audioEnabled} videoEnabled={videoEnabled}
-        screenSharing={screenSharing} chatOpen={chatOpen}
-        whiteboardOpen={whiteboardOpen} unread={unread}
-        handRaised={handRaised} isHost={isHost}
+        audioEnabled={audioEnabled}
+        videoEnabled={videoEnabled}
+        screenSharing={screenSharing}
+        chatOpen={chatOpen}
+        whiteboardOpen={whiteboardOpen}
+        unread={unread}
+        handRaised={handRaised}
+        isHost={isHost}
         recording={recording}
         transcribeOpen={transcribeOpen}
         breakoutOpen={breakoutOpen}
@@ -631,16 +930,22 @@ export default function Room() {
         onToggleVideo={toggleVideo}
         onToggleScreen={toggleScreenShare}
         onToggleChat={handleToggleChat}
-        onToggleWhiteboard={() => setWhiteboardOpen(o => !o)}
+        onToggleWhiteboard={() => setWhiteboardOpen((o) => !o)}
         onRaiseHand={handleRaiseHand}
         onOpenSettings={() => setSettingsOpen(true)}
-        onReaction={() => setReactionOpen(o => !o)}
+        onReaction={() => setReactionOpen((o) => !o)}
         onRecord={isHost ? handleRecord : null}
         onLeave={handleLeave}
-        onToggleTranscribe={() => setTranscribeOpen(o => !o)}
-        onToggleBreakout={() => setBreakoutOpen(o => !o)}
-        onTogglePoll={() => { setPollOpen(o => !o); setPollBadge(0); }}
-        onToggleQnA={() => { setQnaOpen(o => !o); setQnaBadge(0); }}
+        onToggleTranscribe={() => setTranscribeOpen((o) => !o)}
+        onToggleBreakout={() => setBreakoutOpen((o) => !o)}
+        onTogglePoll={() => {
+          setPollOpen((o) => !o);
+          setPollBadge(0);
+        }}
+        onToggleQnA={() => {
+          setQnaOpen((o) => !o);
+          setQnaBadge(0);
+        }}
         docPipOpen={!!docPipWindow}
         onToggleDocPip={handleToggleDocPip}
       />
@@ -648,48 +953,82 @@ export default function Room() {
       {/* ── Emoji reaction picker ── */}
       {reactionOpen && (
         <div className={styles.reactionPicker}>
-          {['👍', '❤️', '😂', '😮', '👏', '🔥', '🎉', '😢', '💯', '🤔'].map(e => (
-            <button key={e} className={styles.reactionBtn} onClick={() => sendReaction(e)}>{e}</button>
-          ))}
+          {["👍", "❤️", "😂", "😮", "👏", "🔥", "🎉", "😢", "💯", "🤔"].map(
+            (e) => (
+              <button
+                key={e}
+                className={styles.reactionBtn}
+                onClick={() => sendReaction(e)}
+              >
+                {e}
+              </button>
+            ),
+          )}
         </div>
       )}
 
       {/* ── Chat panel ── */}
       {chatOpen && (
-        <ChatPanel messages={messages} userId={userId}
-          onSend={sendMessage} onClose={() => setChatOpen(false)} />
+        <ChatPanel
+          messages={messages}
+          userId={userId}
+          onSend={sendMessage}
+          onClose={() => setChatOpen(false)}
+        />
       )}
 
       {/* ── Whiteboard ── */}
       {whiteboardOpen && socket && (
-        <Whiteboard socket={socket} roomId={roomId} userId={userId}
-          userName={userName} wbAllowed={wbAllowed || isHost}
-          onClose={() => setWhiteboardOpen(false)} />
+        <Whiteboard
+          socket={socket}
+          roomId={roomId}
+          userId={userId}
+          userName={userName}
+          wbAllowed={wbAllowed || isHost}
+          onClose={() => setWhiteboardOpen(false)}
+        />
       )}
 
       {/* ── Floating video strip (whiteboard overlay) ── */}
       {whiteboardOpen && (
-        <FloatingVideos localStream={localStream} peers={peers}
-          localUserName={userName} audioEnabled={audioEnabled} videoEnabled={videoEnabled} />
+        <FloatingVideos
+          localStream={localStream}
+          peers={peers}
+          localUserName={userName}
+          audioEnabled={audioEnabled}
+          videoEnabled={videoEnabled}
+        />
       )}
 
       {/* ── Settings panel ── */}
       {settingsOpen && (
         <SettingsPanel
-          peers={enrichedPeers} socket={socket} roomId={roomId}
-          isHost={isHost} wbPermissions={wbPermissions}
-          onWbPermChange={(sid, allowed) => setWbPermissions(p => ({ ...p, [sid]: allowed }))}
-          onClose={() => setSettingsOpen(false)} />
+          peers={enrichedPeers}
+          socket={socket}
+          roomId={roomId}
+          isHost={isHost}
+          wbPermissions={wbPermissions}
+          onWbPermChange={(sid, allowed) =>
+            setWbPermissions((p) => ({ ...p, [sid]: allowed }))
+          }
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
 
       {/* ── PiP overlay (in-tab or Document PiP) ── */}
       {docPipWindow ? (
         <DocumentPipPortal pipWindow={docPipWindow}>
           <PipWindow
-            visible={true} isDocPip={true}
-            localStream={localStream} peers={peers} pinnedId={pinnedId}
-            localUserName={userName} audioEnabled={audioEnabled} videoEnabled={videoEnabled}
-            onPin={handlePin} onUnpin={() => setPinnedId(null)}
+            visible={true}
+            isDocPip={true}
+            localStream={localStream}
+            peers={peers}
+            pinnedId={pinnedId}
+            localUserName={userName}
+            audioEnabled={audioEnabled}
+            videoEnabled={videoEnabled}
+            onPin={handlePin}
+            onUnpin={() => setPinnedId(null)}
             onDismiss={() => docPipWindow.close()}
             onReturnToMeet={() => window.focus()}
             onToggleAudio={toggleAudio}
@@ -699,11 +1038,20 @@ export default function Room() {
         </DocumentPipPortal>
       ) : (
         <PipWindow
-          visible={pipVisible} isDocPip={false}
-          localStream={localStream} peers={peers} pinnedId={pinnedId}
-          localUserName={userName} audioEnabled={audioEnabled} videoEnabled={videoEnabled}
-          onPin={handlePin} onUnpin={() => setPinnedId(null)}
-          onDismiss={() => { pipDismissedRef.current = true; setPipVisible(false); }}
+          visible={pipVisible}
+          isDocPip={false}
+          localStream={localStream}
+          peers={peers}
+          pinnedId={pinnedId}
+          localUserName={userName}
+          audioEnabled={audioEnabled}
+          videoEnabled={videoEnabled}
+          onPin={handlePin}
+          onUnpin={() => setPinnedId(null)}
+          onDismiss={() => {
+            pipDismissedRef.current = true;
+            setPipVisible(false);
+          }}
           onReturnToMeet={() => window.focus()}
           onToggleAudio={toggleAudio}
           onToggleVideo={toggleVideo}
@@ -714,8 +1062,11 @@ export default function Room() {
       {/* ── Transcribe panel ── */}
       {transcribeOpen && (
         <TranscribePanel
-          isHost={isHost} socket={socket} roomId={roomId}
-          userId={userId} userName={userName}
+          isHost={isHost}
+          socket={socket}
+          roomId={roomId}
+          userId={userId}
+          userName={userName}
           permitted={transcribePermitted}
           onClose={() => setTranscribeOpen(false)}
         />
@@ -724,8 +1075,12 @@ export default function Room() {
       {/* ── Breakout panel ── */}
       {breakoutOpen && (
         <BreakoutPanel
-          isHost={isHost} socket={socket} roomId={roomId}
-          userId={userId} userName={userName} peers={enrichedPeers}
+          isHost={isHost}
+          socket={socket}
+          roomId={roomId}
+          userId={userId}
+          userName={userName}
+          peers={enrichedPeers}
           onClose={() => setBreakoutOpen(false)}
         />
       )}
@@ -733,7 +1088,9 @@ export default function Room() {
       {/* ── Poll panel ── */}
       {pollOpen && (
         <PollPanel
-          isHost={isHost} socket={socket} roomId={roomId}
+          isHost={isHost}
+          socket={socket}
+          roomId={roomId}
           userId={userId}
           onClose={() => setPollOpen(false)}
         />
@@ -742,8 +1099,11 @@ export default function Room() {
       {/* ── Q&A panel ── */}
       {qnaOpen && (
         <QnAPanel
-          isHost={isHost} socket={socket} roomId={roomId}
-          userId={userId} userName={userName}
+          isHost={isHost}
+          socket={socket}
+          roomId={roomId}
+          userId={userId}
+          userName={userName}
           onClose={() => setQnaOpen(false)}
         />
       )}
