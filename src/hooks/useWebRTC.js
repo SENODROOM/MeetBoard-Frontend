@@ -9,11 +9,11 @@ const ICE = {
 };
 
 export const useWebRTC = ({ socket, roomId, userId, userName }) => {
-  const localStreamRef = useRef(null); // camera stream
-  const camStreamRef = useRef(null); // camera stream backup
-  const screenStreamRef = useRef(null); // screen stream
-  const peersRef = useRef({}); // { [sid]: RTCPeerConnection }
-  const peerScreenSendersRef = useRef({}); // { [sid]: RTCRtpSender } screen track sender
+  const localStreamRef = useRef(null);
+  const camStreamRef = useRef(null);
+  const screenStreamRef = useRef(null);
+  const peersRef = useRef({});
+  const peerScreenSendersRef = useRef({});
 
   const [peers, setPeers] = useState([]);
   const [localStream, setLocalStream] = useState(null);
@@ -22,33 +22,38 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [screenSharing, setScreenSharing] = useState(false);
 
-  // Stable ref to socket so async callbacks never go stale
+  // Stable ref so async callbacks always have the latest socket
   const socketRef = useRef(socket);
+  const userNameRef = useRef(userName);
   useEffect(() => {
     socketRef.current = socket;
   }, [socket]);
+  useEffect(() => {
+    userNameRef.current = userName;
+  }, [userName]);
 
-  // ─── Renegotiate with a single peer after track changes ──────────────────────
-  // After addTrack / removeTrack on an already-connected PeerConnection the browser
-  // does NOT automatically send a new offer — you must do it manually.
-  // Without this the remote side never receives the new track.
-  const renegotiate = useCallback(
-    async (sid) => {
-      const pc = peersRef.current[sid];
-      const s = socketRef.current;
-      if (!pc || !s || pc.signalingState === "closed") return;
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        s.emit("offer", { to: sid, from: s.id, offer, userName });
-      } catch (e) {
-        console.warn("renegotiate error", sid, e);
-      }
-    },
-    [userName],
-  );
+  // ── Renegotiate with one peer after addTrack / removeTrack ───────────────────
+  // WebRTC does NOT automatically tell the remote side about new/removed tracks.
+  // We must create a new offer and send it through signalling every time.
+  const renegotiate = useCallback(async (sid) => {
+    const pc = peersRef.current[sid];
+    const s = socketRef.current;
+    if (!pc || !s || pc.signalingState === "closed") return;
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      s.emit("offer", {
+        to: sid,
+        from: s.id,
+        offer,
+        userName: userNameRef.current,
+      });
+    } catch (e) {
+      console.warn("renegotiate error", sid, e);
+    }
+  }, []);
 
-  // ─── Init camera / mic ───────────────────────────────────────────────────────
+  // ── Init camera / mic ────────────────────────────────────────────────────────
   const initLocalStream = useCallback(async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
@@ -75,7 +80,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     }
   }, []);
 
-  // ─── Remove a peer ───────────────────────────────────────────────────────────
+  // ── Remove a peer ────────────────────────────────────────────────────────────
   const removePeer = useCallback((sid) => {
     if (peersRef.current[sid]) {
       peersRef.current[sid].close();
@@ -85,7 +90,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     setPeers((p) => p.filter((x) => x.socketId !== sid));
   }, []);
 
-  // ─── Create RTCPeerConnection ────────────────────────────────────────────────
+  // ── Create RTCPeerConnection ─────────────────────────────────────────────────
   const createPeerConnection = useCallback(
     (sid, remoteUserName) => {
       if (peersRef.current[sid]) {
@@ -95,16 +100,16 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
 
       const pc = new RTCPeerConnection(ICE);
 
-      // Add camera / mic tracks
+      // Add camera tracks
       if (localStreamRef.current) {
         localStreamRef.current
           .getTracks()
           .forEach((t) => pc.addTrack(t, localStreamRef.current));
       }
 
-      // If we are ALREADY screen-sharing when a new peer joins, add the screen
-      // track before we call createOffer — it will be included in that first offer
-      // automatically, so no separate renegotiation is needed for this peer.
+      // If we are already screen-sharing when this new peer joins, add the screen
+      // track NOW — before we call createOffer — so it is included in the very
+      // first offer and no separate renegotiation is needed for this peer.
       if (screenStreamRef.current) {
         const screenTrack = screenStreamRef.current.getVideoTracks()[0];
         if (screenTrack) {
@@ -123,9 +128,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         }
       };
 
-      // Separate the two possible incoming video tracks:
-      //   track 1 → camera stream
-      //   track 2 → screen-share stream
+      // Separate incoming tracks: track 1 = camera, track 2 = screen share
       const remoteStream = new MediaStream();
       const remoteScreenStream = new MediaStream();
       let videoTrackCount = 0;
@@ -136,9 +139,9 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         } else {
           videoTrackCount += 1;
           if (videoTrackCount === 1) {
-            remoteStream.addTrack(track);
+            remoteStream.addTrack(track); // first video = camera
           } else {
-            remoteScreenStream.addTrack(track);
+            remoteScreenStream.addTrack(track); // second video = screen
           }
         }
 
@@ -168,7 +171,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     [removePeer],
   );
 
-  // ─── Socket event handlers ───────────────────────────────────────────────────
+  // ── Socket events ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
 
@@ -207,7 +210,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       }
       try {
         // Renegotiation offers can arrive while we already have a local offer
-        // (e.g. the remote peer added their screen track). Roll back first.
+        // (the remote peer added their screen track). Roll back our local offer first.
         if (pc.signalingState === "have-local-offer") {
           await pc.setLocalDescription({ type: "rollback" });
         }
@@ -241,7 +244,6 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     const handleUserLeft = ({ socketId }) => removePeer(socketId);
     const handleKicked = () => window.dispatchEvent(new Event("qm-kicked"));
 
-    // Peer signalled that they stopped screen-sharing — clear their screen tile
     const handlePeerScreenStopped = ({ socketId }) => {
       setPeers((prev) =>
         prev.map((p) =>
@@ -271,7 +273,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     };
   }, [socket, createPeerConnection, removePeer, userName]);
 
-  // ─── Audio toggle ────────────────────────────────────────────────────────────
+  // ── Audio toggle ─────────────────────────────────────────────────────────────
   const toggleAudio = useCallback(() => {
     if (!localStreamRef.current) return;
     const enabled = !audioEnabled;
@@ -282,7 +284,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     if (socket) socket.emit("toggle-audio", { roomId, userId, enabled });
   }, [audioEnabled, socket, roomId, userId]);
 
-  // ─── Video toggle ────────────────────────────────────────────────────────────
+  // ── Video toggle ─────────────────────────────────────────────────────────────
   const toggleVideo = useCallback(() => {
     if (!localStreamRef.current) return;
     const enabled = !videoEnabled;
@@ -293,17 +295,17 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     if (socket) socket.emit("toggle-video", { roomId, userId, enabled });
   }, [videoEnabled, socket, roomId, userId]);
 
-  // ─── Screen share toggle ─────────────────────────────────────────────────────
+  // ── Screen share toggle ──────────────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
     if (screenSharing) {
-      // ── STOP SCREEN SHARE ─────────────────────────────────────────────────────
+      // ── STOP ────────────────────────────────────────────────────────────────
       screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
       setScreenStream(null);
       setScreenSharing(false);
 
-      // Remove the screen sender from every peer, then renegotiate so they know
-      // the track is gone.
+      // Remove screen sender from every peer then renegotiate so the remote
+      // side removes the track from its stream.
       for (const sid of Object.keys(peersRef.current)) {
         const pc = peersRef.current[sid];
         const sender = peerScreenSendersRef.current[sid];
@@ -316,10 +318,10 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         }
       }
 
-      // Fast-path: also signal via socket so the UI clears immediately
-      if (socket) socket.emit("screen-share-stopped", { roomId });
+      if (socketRef.current)
+        socketRef.current.emit("screen-share-stopped", { roomId });
     } else {
-      // ── START SCREEN SHARE ────────────────────────────────────────────────────
+      // ── START ────────────────────────────────────────────────────────────────
       try {
         const ss = await navigator.mediaDevices.getDisplayMedia({
           video: { frameRate: { ideal: 30 } },
@@ -329,20 +331,20 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         screenStreamRef.current = ss;
         const screenTrack = ss.getVideoTracks()[0];
 
-        // Add the screen track to every connected peer, then send a new offer.
-        // ↑ THIS IS THE CRITICAL STEP — without renegotiate() the remote peer
-        //   never receives the track and their ontrack handler never fires.
+        // Add screen track to each connected peer then renegotiate.
+        // THE CRITICAL PART: without renegotiate() the remote peer's ontrack
+        // never fires — addTrack alone is completely silent on an established connection.
         for (const sid of Object.keys(peersRef.current)) {
           const pc = peersRef.current[sid];
           const sender = pc.addTrack(screenTrack, ss);
           peerScreenSendersRef.current[sid] = sender;
-          await renegotiate(sid);
+          await renegotiate(sid); // ← sends new offer so remote ontrack fires
         }
 
         setScreenStream(ss);
         setScreenSharing(true);
 
-        // Handle browser-native "Stop sharing" button
+        // Browser "Stop sharing" button
         screenTrack.onended = async () => {
           screenStreamRef.current?.getTracks().forEach((t) => t.stop());
           screenStreamRef.current = null;
@@ -361,17 +363,16 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
             }
           }
 
-          if (socketRef.current) {
+          if (socketRef.current)
             socketRef.current.emit("screen-share-stopped", { roomId });
-          }
         };
       } catch (e) {
         console.error("Screen share failed:", e);
       }
     }
-  }, [screenSharing, socket, roomId, renegotiate]);
+  }, [screenSharing, roomId, renegotiate]);
 
-  // ─── Cleanup on leave ────────────────────────────────────────────────────────
+  // ── Cleanup ──────────────────────────────────────────────────────────────────
   const cleanup = useCallback(() => {
     Object.values(peersRef.current).forEach((pc) => pc.close());
     peersRef.current = {};

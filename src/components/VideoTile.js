@@ -1,14 +1,21 @@
-import React, { useRef, useEffect, useState } from 'react';
-import styles from './VideoTile.module.css';
+import React, { useRef, useEffect, useState } from "react";
+import styles from "./VideoTile.module.css";
 
 export default function VideoTile({
-  stream, userName, isLocal, isScreen = false,
-  audioEnabled = true, videoEnabled = true,
-  isPinned, onPin, isHost, onKick,
+  stream,
+  userName,
+  isLocal,
+  isScreen = false,
+  audioEnabled = true,
+  videoEnabled = true,
+  isPinned,
+  onPin,
+  isHost,
+  onKick,
 }) {
   const videoRef = useRef(null);
   const [hover, setHover] = useState(false);
-  const [vol, setVol] = useState(0); // 0-1 audio level
+  const [vol, setVol] = useState(0);
   const analyserRef = useRef(null);
   const rafRef = useRef(null);
 
@@ -19,30 +26,29 @@ export default function VideoTile({
     video.srcObject = stream || null;
 
     if (stream) {
-      // Force play — needed when stream arrives after mount or tracks added late
       const tryPlay = () => {
         video.play().catch(() => {});
       };
-      video.addEventListener('loadedmetadata', tryPlay, { once: true });
-      // Also try immediately in case metadata already loaded
+      video.addEventListener("loadedmetadata", tryPlay, { once: true });
       if (video.readyState >= 1) tryPlay();
 
-      // Auto PiP when moving to another tab (Chromium feature)
-      if (!isLocal && 'autoPictureInPicture' in video) {
+      if (!isLocal && "autoPictureInPicture" in video) {
         video.autoPictureInPicture = true;
       }
 
-      // If a new track is added to the stream after mount, re-attach
-      const onTrackAdded = () => { video.srcObject = null; video.srcObject = stream; };
-      stream.addEventListener('addtrack', onTrackAdded);
+      const onTrackAdded = () => {
+        video.srcObject = null;
+        video.srcObject = stream;
+      };
+      stream.addEventListener("addtrack", onTrackAdded);
       return () => {
-        video.removeEventListener('loadedmetadata', tryPlay);
-        stream.removeEventListener('addtrack', onTrackAdded);
+        video.removeEventListener("loadedmetadata", tryPlay);
+        stream.removeEventListener("addtrack", onTrackAdded);
       };
     }
   }, [stream, isLocal]);
 
-  // Audio level meter (green glow when speaking)
+  // Audio level meter
   useEffect(() => {
     if (!stream || isLocal) return;
     let ctx, src;
@@ -61,44 +67,75 @@ export default function VideoTile({
         rafRef.current = requestAnimationFrame(tick);
       };
       tick();
-    } catch { }
+    } catch {}
     return () => {
       cancelAnimationFrame(rafRef.current);
-      try { src?.disconnect(); ctx?.close(); } catch { }
+      try {
+        src?.disconnect();
+        ctx?.close();
+      } catch {}
     };
   }, [stream, isLocal]);
 
   const isSpeaking = vol > 0.12 && audioEnabled && !isLocal;
-  const initials = (userName || '?').slice(0, 2).toUpperCase();
-  const hueShift = [...(userName || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  const initials = (userName || "?").slice(0, 2).toUpperCase();
+  const hueShift =
+    [...(userName || "")].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+
+  // PiP: show for all screen tiles and all remote camera tiles
+  const showPip = document.pictureInPictureEnabled && (!isLocal || isScreen);
+
+  const handlePip = async (e) => {
+    e.stopPropagation();
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      if (video.paused) await video.play();
+      if (document.pictureInPictureElement === video) {
+        await document.exitPictureInPicture();
+      } else {
+        await video.requestPictureInPicture();
+      }
+    } catch (err) {
+      console.error("PiP error", err);
+    }
+  };
+
+  // FIX: keep overlay visible while pinned so users can see and click Unpin
+  const showOverlay = hover || isPinned;
 
   return (
     <div
-      className={`${styles.tile} ${isPinned ? styles.pinned : ''} ${isSpeaking ? styles.speaking : ''}`}
-      style={isSpeaking ? { '--vol': vol } : {}}
+      className={`${styles.tile} ${isPinned ? styles.pinned : ""} ${isSpeaking ? styles.speaking : ""}`}
+      style={isSpeaking ? { "--vol": vol } : {}}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      {/* Video */}
       <video
         ref={videoRef}
-        autoPlay playsInline
-        muted={isLocal}
+        autoPlay
+        playsInline
+        muted={isLocal && !isScreen}
         className={styles.video}
-        style={{ transform: (isLocal && !isScreen) ? 'scaleX(-1)' : 'none', opacity: videoEnabled ? 1 : 0 }}
+        style={{
+          transform: isLocal && !isScreen ? "scaleX(-1)" : "none",
+          opacity: videoEnabled ? 1 : 0,
+        }}
       />
 
-      {/* Avatar when camera off (not for screen-share tiles) */}
       {!videoEnabled && !isScreen && (
-        <div className={styles.avatar} style={{ '--hue': hueShift }}>
+        <div className={styles.avatar} style={{ "--hue": hueShift }}>
           <span>{initials}</span>
         </div>
       )}
 
-      {/* Speaking ring */}
-      {isSpeaking && <div className={styles.speakRing} style={{ opacity: 0.4 + vol * 0.6 }} />}
+      {isSpeaking && (
+        <div
+          className={styles.speakRing}
+          style={{ opacity: 0.4 + vol * 0.6 }}
+        />
+      )}
 
-      {/* Name tag */}
       <div className={styles.nameTag}>
         {!audioEnabled && <span className={styles.muteIcon}>🔇</span>}
         {isLocal && !isScreen && <span className={styles.youPill}>You</span>}
@@ -106,38 +143,43 @@ export default function VideoTile({
         <span className={styles.name}>{userName}</span>
       </div>
 
-      {/* Pin badge */}
       {isPinned && <div className={styles.pinBadge}>📌</div>}
 
-      {/* Hover overlay */}
-      {hover && (
+      {showOverlay && (
         <div className={styles.overlay}>
-          <button className={styles.overlayBtn} onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>
-            {isPinned ? '📌 Unpin' : '📌 Pin'}
+          {/* FIX: stopPropagation prevents the click from bubbling to the tile
+              div, which was triggering onMouseLeave → hover=false → overlay
+              disappears before onPin could register, making pin feel broken. */}
+          <button
+            className={styles.overlayBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPin && onPin();
+            }}
+            title={isPinned ? "Unpin" : "Pin"}
+          >
+            {isPinned ? "📌 Unpin" : "📌 Pin"}
           </button>
-          {!isLocal && document.pictureInPictureEnabled && (
+
+          {showPip && (
             <button
               className={styles.overlayBtn}
-              onClick={async (e) => {
-                e.stopPropagation();
-                if (!videoRef.current) return;
-                try {
-                  if (document.pictureInPictureElement === videoRef.current) {
-                    await document.exitPictureInPicture();
-                  } else {
-                    await videoRef.current.requestPictureInPicture();
-                  }
-                } catch (err) {
-                  console.error('PiP error', err);
-                }
-              }}
-              title="Toggle PiP"
+              onClick={handlePip}
+              title="Picture in Picture"
             >
               🖥️ PiP
             </button>
           )}
-          {isHost && onKick && (
-            <button className={`${styles.overlayBtn} ${styles.kickBtn}`} onClick={onKick}>
+
+          {/* Never show kick on screen tiles — they are not real participants */}
+          {isHost && onKick && !isScreen && (
+            <button
+              className={`${styles.overlayBtn} ${styles.kickBtn}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onKick();
+              }}
+            >
               🚫 Remove
             </button>
           )}
