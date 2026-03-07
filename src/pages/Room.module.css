@@ -250,25 +250,50 @@
 .videoGrid {
   flex: 1;
   display: grid;
-  gap: 5px;
-  padding: 7px;
+  gap: 6px;
+  padding: 8px;
   min-height: 0;
   overflow: hidden;
+  align-content: stretch;
 }
 
+/* 1 person: full area */
 .grid1 {
   grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
 }
 
+/* 2 people: side by side */
 .grid2 {
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
 }
 
+/* 3 people: 2 on top row, 1 centred below */
+.grid3 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.grid3 > :last-child {
+  grid-column: 1 / -1;
+  max-width: 50%;
+  justify-self: center;
+  width: 100%;
+}
+
+/* 4 people: 2×2 */
 .grid4 {
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
 }
 
+/* 5–6 people: 3 columns, 2 rows */
+.grid6 {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1fr 1fr;
+}
+
+/* 7+ people: auto 3-column rows */
 .gridMany {
   grid-template-columns: repeat(3, 1fr);
   grid-auto-rows: 1fr;

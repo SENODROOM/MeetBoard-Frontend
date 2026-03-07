@@ -27,6 +27,7 @@ export default function Controls({
   handRaised, isHost, recording,
   transcribeOpen, breakoutOpen, pollOpen, qnaOpen,
   pollBadge, qnaBadge,
+  wbActive,
   onToggleAudio, onToggleVideo, onToggleScreen,
   onToggleChat, onToggleWhiteboard,
   onRaiseHand, onOpenSettings, onReaction, onRecord, onLeave,
@@ -62,7 +63,10 @@ export default function Controls({
           <span className={styles.label}>Chat</span>
         </Btn>
         <Btn onClick={onToggleWhiteboard} active={whiteboardOpen} title="Whiteboard">
-          <span className={styles.icon}>🖊️</span>
+          <span className={styles.icon}>
+            🖊️
+            {wbActive && <span className={styles.wbActiveDot} title="Someone is drawing" />}
+          </span>
           <span className={styles.label}>Board</span>
         </Btn>
         <Btn onClick={onReaction} title="Reactions">

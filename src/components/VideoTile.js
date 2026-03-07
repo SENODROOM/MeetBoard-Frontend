@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import styles from './VideoTile.module.css';
 
 export default function VideoTile({
-  stream, userName, isLocal,
+  stream, userName, isLocal, isScreen = false,
   audioEnabled = true, videoEnabled = true,
   isPinned, onPin, isHost, onKick,
 }) {
@@ -13,13 +13,32 @@ export default function VideoTile({
   const rafRef = useRef(null);
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream || null;
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.srcObject = stream || null;
+
+    if (stream) {
+      // Force play — needed when stream arrives after mount or tracks added late
+      const tryPlay = () => {
+        video.play().catch(() => {});
+      };
+      video.addEventListener('loadedmetadata', tryPlay, { once: true });
+      // Also try immediately in case metadata already loaded
+      if (video.readyState >= 1) tryPlay();
 
       // Auto PiP when moving to another tab (Chromium feature)
-      if (!isLocal && 'autoPictureInPicture' in videoRef.current) {
-        videoRef.current.autoPictureInPicture = true;
+      if (!isLocal && 'autoPictureInPicture' in video) {
+        video.autoPictureInPicture = true;
       }
+
+      // If a new track is added to the stream after mount, re-attach
+      const onTrackAdded = () => { video.srcObject = null; video.srcObject = stream; };
+      stream.addEventListener('addtrack', onTrackAdded);
+      return () => {
+        video.removeEventListener('loadedmetadata', tryPlay);
+        stream.removeEventListener('addtrack', onTrackAdded);
+      };
     }
   }, [stream, isLocal]);
 
@@ -66,11 +85,11 @@ export default function VideoTile({
         autoPlay playsInline
         muted={isLocal}
         className={styles.video}
-        style={{ transform: isLocal ? 'scaleX(-1)' : 'none', opacity: videoEnabled ? 1 : 0 }}
+        style={{ transform: (isLocal && !isScreen) ? 'scaleX(-1)' : 'none', opacity: videoEnabled ? 1 : 0 }}
       />
 
-      {/* Avatar when camera off */}
-      {!videoEnabled && (
+      {/* Avatar when camera off (not for screen-share tiles) */}
+      {!videoEnabled && !isScreen && (
         <div className={styles.avatar} style={{ '--hue': hueShift }}>
           <span>{initials}</span>
         </div>
@@ -82,7 +101,8 @@ export default function VideoTile({
       {/* Name tag */}
       <div className={styles.nameTag}>
         {!audioEnabled && <span className={styles.muteIcon}>🔇</span>}
-        {isLocal && <span className={styles.youPill}>You</span>}
+        {isLocal && !isScreen && <span className={styles.youPill}>You</span>}
+        {isScreen && <span className={styles.screenPill}>Screen</span>}
         <span className={styles.name}>{userName}</span>
       </div>
 

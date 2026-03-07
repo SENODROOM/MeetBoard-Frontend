@@ -4,6 +4,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useMeetingRecorder } from '../hooks/useMeetingRecorder';
+import { useSounds } from '../hooks/useSounds';
 import VideoTile from '../components/VideoTile';
 import ChatPanel from '../components/ChatPanel';
 import Controls from '../components/Controls';
@@ -138,6 +139,9 @@ export default function Room() {
     }).catch(() => { });
   }, [classroomId, messages]);
 
+  // ── Sounds ───────────────────────────────────────────────────────────────────
+  const { playJoin, playLeave, playMessage, playKnock } = useSounds();
+
   // ── Socket init ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!nameConfirmed) return;
@@ -148,11 +152,14 @@ export default function Room() {
     s.on('chat-message', msg => {
       setMessages(p => [...p, msg]);
       setChatOpen(prev => { if (!prev) setUnread(u => u + 1); return prev; });
+      playMessage();
     });
-    s.on('knock-request', ({ socketId, userName: kName }) =>
-      setKnockRequests(p => [...p, { socketId, userName: kName }]));
-    s.on('knock-accepted', () => setKnockStatus('accepted'));
-    s.on('knock-rejected', () => setKnockStatus('rejected'));
+    s.on('knock-request', ({ socketId, userName: kName }) => {
+      setKnockRequests(p => [...p, { socketId, userName: kName }]);
+      playKnock();
+    });
+    s.on('knock-accepted', () => { setKnockStatus('accepted'); playJoin(); });
+    s.on('knock-rejected', () => { setKnockStatus('rejected'); playKnock(); });
 
     // Host controls
     s.on('force-mute', () => window.dispatchEvent(new Event('qm-force-mute')));
@@ -173,8 +180,11 @@ export default function Room() {
       setPeerMeta(m => ({ ...m, [socketId]: { ...m[socketId], handRaised: true, userName: n } })));
     s.on('peer-hand-lower', ({ socketId }) =>
       setPeerMeta(m => ({ ...m, [socketId]: { ...m[socketId], handRaised: false } })));
-    s.on('user-left', ({ socketId }) =>
-      setPeerMeta(m => { const n = { ...m }; delete n[socketId]; return n; }));
+    s.on('user-joined', () => playJoin());
+    s.on('user-left', ({ socketId }) => {
+      playLeave();
+      setPeerMeta(m => { const n = { ...m }; delete n[socketId]; return n; });
+    });
 
     // Transcription permission
     s.on('transcribe-permission', ({ allowed }) => setTranscribePermitted(allowed));
@@ -184,7 +194,7 @@ export default function Room() {
     s.on('qna-new', () => { setQnaBadge(b => b + 1); });
 
     return () => s.disconnect();
-  }, [nameConfirmed]);
+  }, [nameConfirmed, playJoin, playLeave, playMessage, playKnock]);
 
   // ── Room info ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -401,20 +411,45 @@ export default function Room() {
   );
 
   // ── Layout helpers ────────────────────────────────────────────────────────────
+  // Build participant list.
+  // When screen sharing, add a dedicated screen tile AFTER the local camera tile.
   const allParticipants = [
-    { socketId: 'local', userName, stream: localStream, isLocal: true },
+    { socketId: 'local', userName, stream: localStream, isLocal: true, isScreen: false },
     ...(screenSharing && screenStream
-      ? [{ socketId: 'screen-local', userName: userName + "'s screen", stream: screenStream, isLocal: true, isScreen: true }]
+      ? [{ socketId: 'screen-local', userName: userName + "'s screen", stream: screenStream, isLocal: false, isScreen: true }]
       : []),
-    ...peers.map(p => ({ ...p, isLocal: false })),
+    ...peers.map(p => ({ ...p, isLocal: false, isScreen: false })),
   ];
   const pinnedP = pinnedId ? allParticipants.find(p => p.socketId === pinnedId) : null;
   const others = pinnedP ? allParticipants.filter(p => p.socketId !== pinnedId) : allParticipants;
   const n = allParticipants.length;
-  const gridClass = n === 1 ? styles.grid1 : n === 2 ? styles.grid2 : n <= 4 ? styles.grid4 : styles.gridMany;
+  // Responsive grid: tiles fill available space cleanly for every count
+  const gridClass = (() => {
+    if (n === 1) return styles.grid1;
+    if (n === 2) return styles.grid2;
+    if (n === 3) return styles.grid3;
+    if (n === 4) return styles.grid4;
+    if (n <= 6)  return styles.grid6;
+    return styles.gridMany;
+  })();
   const raisedHands = enrichedPeers.filter(p => p.handRaised);
 
   // ── Main render ───────────────────────────────────────────────────────────────
+
+  // Helper: get correct audio/video enabled state for any participant tile
+  const tileAudio = (p) => {
+    if (p.isLocal) return audioEnabled;
+    if (p.isScreen) return true;            // screen tile has no audio
+    const meta = peerMeta[p.socketId];
+    return meta ? !meta.audioMuted : true;
+  };
+  const tileVideo = (p) => {
+    if (p.isLocal) return videoEnabled;
+    if (p.isScreen) return true;            // screen share is always "video on"
+    const meta = peerMeta[p.socketId];
+    return meta ? !meta.videoStopped : true;
+  };
+
   return (
     <div className={styles.room}>
 
@@ -500,9 +535,9 @@ export default function Room() {
           <div className={styles.spotlightMain}>
             {(() => {
               const sp = pinnedP || allParticipants[0]; return (
-                <VideoTile stream={sp.stream} userName={sp.userName} isLocal={sp.isLocal}
-                  audioEnabled={sp.isLocal ? audioEnabled : true}
-                  videoEnabled={sp.isLocal ? videoEnabled : true}
+                <VideoTile stream={sp.stream} userName={sp.userName} isLocal={sp.isLocal} isScreen={sp.isScreen || false}
+                  audioEnabled={tileAudio(sp)}
+                  videoEnabled={tileVideo(sp)}
                   isPinned={!!pinnedP} onPin={() => handlePin(sp.socketId)}
                   isHost={isHost} onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)} />
               );
@@ -511,9 +546,9 @@ export default function Room() {
           <div className={styles.spotlightStrip}>
             {allParticipants.slice(pinnedP ? 0 : 1).filter(p => p.socketId !== (pinnedP?.socketId)).map(p => (
               <div key={p.socketId} className={styles.stripTile}>
-                <VideoTile stream={p.stream} userName={p.userName} isLocal={p.isLocal}
-                  audioEnabled={p.isLocal ? audioEnabled : true}
-                  videoEnabled={p.isLocal ? videoEnabled : true}
+                <VideoTile stream={p.stream} userName={p.userName} isLocal={p.isLocal} isScreen={p.isScreen || false}
+                  audioEnabled={tileAudio(p)}
+                  videoEnabled={tileVideo(p)}
                   isPinned={pinnedId === p.socketId} onPin={() => handlePin(p.socketId)}
                   isHost={isHost} onKick={p.isLocal ? null : () => handleKickUser(p.socketId)} />
               </div>
@@ -526,9 +561,9 @@ export default function Room() {
           <div className={styles.pinnedMain}>
             {(() => {
               const sp = pinnedP || allParticipants[0]; return (
-                <VideoTile stream={sp.stream} userName={sp.userName} isLocal={sp.isLocal}
-                  audioEnabled={sp.isLocal ? audioEnabled : true}
-                  videoEnabled={sp.isLocal ? videoEnabled : true}
+                <VideoTile stream={sp.stream} userName={sp.userName} isLocal={sp.isLocal} isScreen={sp.isScreen || false}
+                  audioEnabled={tileAudio(sp)}
+                  videoEnabled={tileVideo(sp)}
                   isPinned={!!pinnedP} onPin={() => handlePin(sp.socketId)}
                   isHost={isHost} onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)} />
               );
@@ -536,9 +571,9 @@ export default function Room() {
           </div>
           <div className={styles.pinnedSidebar}>
             {allParticipants.filter(p => p.socketId !== (pinnedP?.socketId || allParticipants[0]?.socketId)).map(p => (
-              <VideoTile key={p.socketId} stream={p.stream} userName={p.userName} isLocal={p.isLocal}
-                audioEnabled={p.isLocal ? audioEnabled : true}
-                videoEnabled={p.isLocal ? videoEnabled : true}
+              <VideoTile key={p.socketId} stream={p.stream} userName={p.userName} isLocal={p.isLocal} isScreen={p.isScreen || false}
+                audioEnabled={tileAudio(p)}
+                videoEnabled={tileVideo(p)}
                 isPinned={pinnedId === p.socketId} onPin={() => handlePin(p.socketId)}
                 isHost={isHost} onKick={p.isLocal ? null : () => handleKickUser(p.socketId)} />
             ))}
@@ -548,18 +583,18 @@ export default function Room() {
         // Pinned tile layout
         <div className={styles.pinnedLayout}>
           <div className={styles.pinnedMain}>
-            <VideoTile stream={pinnedP.stream} userName={pinnedP.userName} isLocal={pinnedP.isLocal}
-              audioEnabled={pinnedP.isLocal ? audioEnabled : true}
-              videoEnabled={pinnedP.isLocal ? videoEnabled : true}
+            <VideoTile stream={pinnedP.stream} userName={pinnedP.userName} isLocal={pinnedP.isLocal} isScreen={pinnedP.isScreen || false}
+              audioEnabled={tileAudio(pinnedP)}
+              videoEnabled={tileVideo(pinnedP)}
               isPinned onPin={() => handlePin(pinnedP.socketId)}
               isHost={isHost} onKick={pinnedP.isLocal ? null : () => handleKickUser(pinnedP.socketId)} />
           </div>
           {others.length > 0 && (
             <div className={styles.pinnedSidebar}>
               {others.map(p => (
-                <VideoTile key={p.socketId} stream={p.stream} userName={p.userName} isLocal={p.isLocal}
-                  audioEnabled={p.isLocal ? audioEnabled : true}
-                  videoEnabled={p.isLocal ? videoEnabled : true}
+                <VideoTile key={p.socketId} stream={p.stream} userName={p.userName} isLocal={p.isLocal} isScreen={p.isScreen || false}
+                  audioEnabled={tileAudio(p)}
+                  videoEnabled={tileVideo(p)}
                   isPinned={false} onPin={() => handlePin(p.socketId)}
                   isHost={isHost} onKick={p.isLocal ? null : () => handleKickUser(p.socketId)} />
               ))}
@@ -570,9 +605,9 @@ export default function Room() {
         // Default grid
         <div className={`${styles.videoGrid} ${gridClass}`}>
           {allParticipants.map(p => (
-            <VideoTile key={p.socketId} stream={p.stream} userName={p.userName} isLocal={p.isLocal}
-              audioEnabled={p.isLocal ? audioEnabled : true}
-              videoEnabled={p.isLocal ? videoEnabled : true}
+            <VideoTile key={p.socketId} stream={p.stream} userName={p.userName} isLocal={p.isLocal} isScreen={p.isScreen || false}
+              audioEnabled={tileAudio(p)}
+              videoEnabled={tileVideo(p)}
               isPinned={pinnedId === p.socketId} onPin={() => handlePin(p.socketId)}
               isHost={isHost} onKick={p.isLocal ? null : () => handleKickUser(p.socketId)} />
           ))}

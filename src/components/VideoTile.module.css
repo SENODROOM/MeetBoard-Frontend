@@ -1,6 +1,9 @@
 .tile {
   position: relative; border-radius: 14px; overflow: hidden;
-  background: #060c18; aspect-ratio: 16/9;
+  background: #060c18;
+  /* No aspect-ratio — tile fills the grid cell completely */
+  width: 100%; height: 100%;
+  min-height: 0; min-width: 0;
   border: 1.5px solid rgba(255,255,255,0.07);
   transition: border-color .2s, box-shadow .2s;
   container-type: inline-size;
@@ -54,3 +57,11 @@
 .overlayBtn:hover { background: rgba(255,255,255,.22); transform: scale(1.04); }
 .kickBtn { background: rgba(255,74,94,.15) !important; border-color: rgba(255,74,94,.35) !important; color: #ff4a5e !important; }
 .kickBtn:hover { background: rgba(255,74,94,.3) !important; }
+
+
+/* Screen-share tile pill */
+.screenPill {
+  font-size: 9px; font-weight: 800; font-family: var(--font-mono,'Space Mono',monospace);
+  background: rgba(157,113,255,.15); border: 1px solid rgba(157,113,255,.35); color: #b197fc;
+  border-radius: 4px; padding: 1px 5px; letter-spacing: .5px;
+}
