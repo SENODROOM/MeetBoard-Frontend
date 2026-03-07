@@ -195,7 +195,7 @@ export default function Room() {
   }, [roomId, nameConfirmed]);
 
   // ── WebRTC ────────────────────────────────────────────────────────────────────
-  const { localStream, peers, audioEnabled, videoEnabled, screenSharing,
+  const { localStream, screenStream, peers, audioEnabled, videoEnabled, screenSharing,
     initLocalStream, toggleAudio, toggleVideo, toggleScreenShare, cleanup,
   } = useWebRTC({ socket, roomId, userId, userName });
 
@@ -403,6 +403,9 @@ export default function Room() {
   // ── Layout helpers ────────────────────────────────────────────────────────────
   const allParticipants = [
     { socketId: 'local', userName, stream: localStream, isLocal: true },
+    ...(screenSharing && screenStream
+      ? [{ socketId: 'screen-local', userName: userName + "'s screen", stream: screenStream, isLocal: true, isScreen: true }]
+      : []),
     ...peers.map(p => ({ ...p, isLocal: false })),
   ];
   const pinnedP = pinnedId ? allParticipants.find(p => p.socketId === pinnedId) : null;

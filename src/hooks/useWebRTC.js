@@ -9,10 +9,12 @@ const ICE = {
 };
 
 export const useWebRTC = ({ socket, roomId, userId, userName }) => {
-  const localStreamRef  = useRef(null);
+  const localStreamRef  = useRef(null);   // always the camera stream
+  const camStreamRef    = useRef(null);   // dedicated camera stream backup
   const peersRef        = useRef({});
   const [peers, setPeers]               = useState([]);
-  const [localStream, setLocalStream]   = useState(null);
+  const [localStream, setLocalStream]   = useState(null);   // camera stream (always)
+  const [screenStream, setScreenStream] = useState(null);   // screen share stream (or null)
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [screenSharing, setScreenSharing] = useState(false);
@@ -22,12 +24,14 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = s;
+      camStreamRef.current   = s;
       setLocalStream(s);
       return s;
     } catch {
       try {
         const s = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
         localStreamRef.current = s;
+        camStreamRef.current   = s;
         setLocalStream(s);
         return s;
       } catch { return null; }
@@ -170,32 +174,60 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
 
   const toggleScreenShare = useCallback(async () => {
     if (screenSharing) {
+      // ── Stop screen share ──────────────────────────────────────────────────
       screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
-      try {
-        const cam = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        localStreamRef.current = cam;
-        setLocalStream(cam);
+      setScreenStream(null);
+
+      // Restore camera video track to all peer connections
+      const camTrack = camStreamRef.current?.getVideoTracks()[0];
+      if (camTrack) {
         Object.values(peersRef.current).forEach((pc) => {
-          const s = pc.getSenders().find((s) => s.track?.kind === 'video');
-          if (s) s.replaceTrack(cam.getVideoTracks()[0]);
+          const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+          if (sender) sender.replaceTrack(camTrack);
         });
-      } catch {}
+      }
+
       setScreenSharing(false);
+      // localStream already points to the camera stream — no change needed
     } else {
       try {
-        const ss = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        // ── Start screen share ─────────────────────────────────────────────
+        const ss = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
         screenStreamRef.current = ss;
-        const track = ss.getVideoTracks()[0];
+        const screenTrack = ss.getVideoTracks()[0];
+
+        // Send the screen track to all connected peers (replaces video sender)
         Object.values(peersRef.current).forEach((pc) => {
-          const s = pc.getSenders().find((s) => s.track?.kind === 'video');
-          if (s) s.replaceTrack(track);
+          const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+          if (sender) sender.replaceTrack(screenTrack);
         });
-        const ns = new MediaStream([track, ...(localStreamRef.current?.getAudioTracks() || [])]);
-        setLocalStream(ns);
-        track.onended = () => toggleScreenShare();
+
+        // Expose the screen stream so Room.js can show it as a separate tile
+        setScreenStream(ss);
         setScreenSharing(true);
-      } catch (e) { console.error('Screen share failed:', e); }
+
+        // When the user stops sharing via browser UI, clean up
+        screenTrack.onended = () => {
+          screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+          screenStreamRef.current = null;
+          setScreenStream(null);
+          setScreenSharing(false);
+
+          // Restore camera video track to peers
+          const camTrack = camStreamRef.current?.getVideoTracks()[0];
+          if (camTrack) {
+            Object.values(peersRef.current).forEach((pc) => {
+              const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+              if (sender) sender.replaceTrack(camTrack);
+            });
+          }
+        };
+
+        // localStream keeps pointing to camera — user can still see themselves
+      } catch (e) {
+        console.error('Screen share failed:', e);
+      }
     }
   }, [screenSharing]);
 
@@ -204,12 +236,14 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     peersRef.current = {};
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+    camStreamRef.current = null;
     setPeers([]);
     setLocalStream(null);
+    setScreenStream(null);
   }, []);
 
   return {
-    localStream, peers, audioEnabled, videoEnabled, screenSharing,
+    localStream, screenStream, peers, audioEnabled, videoEnabled, screenSharing,
     initLocalStream, toggleAudio, toggleVideo, toggleScreenShare, cleanup,
   };
 };
