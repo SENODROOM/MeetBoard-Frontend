@@ -209,12 +209,27 @@
 }
 .strip::-webkit-scrollbar { display: none; }
 
-/* ── Status bar ── */
 .statusBar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 5px 12px;
-  background: rgba(0,0,0,0.3);
-  border-top: 1px solid rgba(255,255,255,0.04);
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.5);
+  border-top: 1px solid rgba(255,255,255,0.06);
 }
-.mediaIcons { display: flex; gap: 6px; font-size: 13px; }
-.count { font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); }
+.mediaBtns { display: flex; gap: 8px; }
+.mediaBtn {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.mediaBtn:hover { background: rgba(255,255,255,0.25); transform: scale(1.05); }
+.mediaBtnOff { background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.5); }
+.mediaBtnOff:hover { background: rgba(239,68,68,0.3); }
+.mediaBtnDanger { background: #ef4444; color: #fff; }
+.mediaBtnDanger:hover { background: #dc2626; }
+.count { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 500;}

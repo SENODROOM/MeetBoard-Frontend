@@ -6,15 +6,22 @@ export default function VideoTile({
   audioEnabled = true, videoEnabled = true,
   isPinned, onPin, isHost, onKick,
 }) {
-  const videoRef  = useRef(null);
+  const videoRef = useRef(null);
   const [hover, setHover] = useState(false);
-  const [vol, setVol]     = useState(0); // 0-1 audio level
+  const [vol, setVol] = useState(0); // 0-1 audio level
   const analyserRef = useRef(null);
-  const rafRef      = useRef(null);
+  const rafRef = useRef(null);
 
   useEffect(() => {
-    if (videoRef.current) videoRef.current.srcObject = stream || null;
-  }, [stream]);
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream || null;
+
+      // Auto PiP when moving to another tab (Chromium feature)
+      if (!isLocal && 'autoPictureInPicture' in videoRef.current) {
+        videoRef.current.autoPictureInPicture = true;
+      }
+    }
+  }, [stream, isLocal]);
 
   // Audio level meter (green glow when speaking)
   useEffect(() => {
@@ -35,16 +42,16 @@ export default function VideoTile({
         rafRef.current = requestAnimationFrame(tick);
       };
       tick();
-    } catch {}
+    } catch { }
     return () => {
       cancelAnimationFrame(rafRef.current);
-      try { src?.disconnect(); ctx?.close(); } catch {}
+      try { src?.disconnect(); ctx?.close(); } catch { }
     };
   }, [stream, isLocal]);
 
   const isSpeaking = vol > 0.12 && audioEnabled && !isLocal;
-  const initials   = (userName || '?').slice(0, 2).toUpperCase();
-  const hueShift   = [...(userName || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  const initials = (userName || '?').slice(0, 2).toUpperCase();
+  const hueShift = [...(userName || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
 
   return (
     <div
@@ -88,6 +95,27 @@ export default function VideoTile({
           <button className={styles.overlayBtn} onClick={onPin} title={isPinned ? 'Unpin' : 'Pin'}>
             {isPinned ? '📌 Unpin' : '📌 Pin'}
           </button>
+          {!isLocal && document.pictureInPictureEnabled && (
+            <button
+              className={styles.overlayBtn}
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (!videoRef.current) return;
+                try {
+                  if (document.pictureInPictureElement === videoRef.current) {
+                    await document.exitPictureInPicture();
+                  } else {
+                    await videoRef.current.requestPictureInPicture();
+                  }
+                } catch (err) {
+                  console.error('PiP error', err);
+                }
+              }}
+              title="Toggle PiP"
+            >
+              🖥️ PiP
+            </button>
+          )}
           {isHost && onKick && (
             <button className={`${styles.overlayBtn} ${styles.kickBtn}`} onClick={onKick}>
               🚫 Remove

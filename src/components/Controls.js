@@ -9,9 +9,9 @@ function Btn({ onClick, active, danger, warn, badge, title, disabled, children }
       disabled={disabled}
       className={[
         styles.btn,
-        active   ? styles.active  : '',
-        danger   ? styles.danger  : '',
-        warn     ? styles.warn    : '',
+        active ? styles.active : '',
+        danger ? styles.danger : '',
+        warn ? styles.warn : '',
         disabled ? styles.dimmed : '',
       ].filter(Boolean).join(' ')}
     >
@@ -31,6 +31,7 @@ export default function Controls({
   onToggleChat, onToggleWhiteboard,
   onRaiseHand, onOpenSettings, onReaction, onRecord, onLeave,
   onToggleTranscribe, onToggleBreakout, onTogglePoll, onToggleQnA,
+  docPipOpen, onToggleDocPip,
 }) {
   return (
     <div className={styles.bar}>
@@ -46,6 +47,10 @@ export default function Controls({
         <Btn onClick={onToggleScreen} active={screenSharing} title="Share screen">
           <span className={styles.icon}>🖥️</span>
           <span className={styles.label}>{screenSharing ? 'Sharing' : 'Share'}</span>
+        </Btn>
+        <Btn onClick={onToggleDocPip} active={docPipOpen} title={docPipOpen ? 'Close PiP' : 'Open PiP'}>
+          <span className={styles.icon}>🪟</span>
+          <span className={styles.label}>PiP</span>
         </Btn>
       </div>
 

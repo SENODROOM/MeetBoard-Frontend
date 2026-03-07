@@ -9,6 +9,7 @@ import ChatPanel from '../components/ChatPanel';
 import Controls from '../components/Controls';
 import Whiteboard from '../components/Whiteboard';
 import PipWindow from '../components/PipWindow';
+import DocumentPipPortal from '../components/DocumentPipPortal';
 import SettingsPanel from '../components/SettingsPanel';
 import FloatingVideos from '../components/FloatingVideos';
 import TranscribePanel from '../components/TranscribePanel';
@@ -21,9 +22,9 @@ const API = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
 const SOCKET_URL = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
 
 export default function Room() {
-  const { roomId }  = useParams();
-  const navigate    = useNavigate();
-  const location    = useLocation();
+  const { roomId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const classroomId = new URLSearchParams(location.search).get('classroom');
 
   // ── Identity — ALL declared first, nothing above these ──────────────────────
@@ -37,8 +38,8 @@ export default function Room() {
 
   // ── Username gate ────────────────────────────────────────────────────────────
   const [nameConfirmed, setNameConfirmed] = useState(() => !!localStorage.getItem('qm_userName'));
-  const [nameInput,  setNameInput]  = useState('');
-  const [nameError,  setNameError]  = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [nameError, setNameError] = useState('');
   const confirmName = () => {
     if (!nameInput.trim()) { setNameError('Please enter your name'); return; }
     localStorage.setItem('qm_userName', nameInput.trim());
@@ -47,45 +48,46 @@ export default function Room() {
   };
 
   // ── Core UI state ────────────────────────────────────────────────────────────
-  const socketRef      = useRef(null);
-  const [socket, setSocket]               = useState(null);
-  const [chatOpen, setChatOpen]           = useState(false);
+  const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const [whiteboardOpen, setWhiteboardOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen]   = useState(false);
-  const [reactionOpen, setReactionOpen]   = useState(false);
-  const [messages, setMessages]           = useState([]);
-  const [unread, setUnread]               = useState(0);
-  const [copied, setCopied]               = useState(false);
-  const [pinnedId, setPinnedId]           = useState(null);
-  const [kicked, setKicked]               = useState(false);
-  const [handRaised, setHandRaised]       = useState(false);
-  const [layout, setLayout]               = useState('grid');
-  const [reactions, setReactions]         = useState([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [reactionOpen, setReactionOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [unread, setUnread] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [pinnedId, setPinnedId] = useState(null);
+  const [kicked, setKicked] = useState(false);
+  const [handRaised, setHandRaised] = useState(false);
+  const [layout, setLayout] = useState('grid');
+  const [reactions, setReactions] = useState([]);
 
   // ── New feature panels ───────────────────────────────────────────────────────
   const [transcribeOpen, setTranscribeOpen] = useState(false);
-  const [breakoutOpen, setBreakoutOpen]     = useState(false);
-  const [pollOpen, setPollOpen]             = useState(false);
-  const [qnaOpen, setQnaOpen]               = useState(false);
+  const [breakoutOpen, setBreakoutOpen] = useState(false);
+  const [pollOpen, setPollOpen] = useState(false);
+  const [qnaOpen, setQnaOpen] = useState(false);
 
   // ── Permissions (host grants to participants) ─────────────────────────────
   const [transcribePermitted, setTranscribePermitted] = useState(false);
-  const [pollBadge, setPollBadge]           = useState(0);
-  const [qnaBadge, setQnaBadge]             = useState(0);
+  const [pollBadge, setPollBadge] = useState(0);
+  const [qnaBadge, setQnaBadge] = useState(0);
 
   // ── Peer meta ────────────────────────────────────────────────────────────────
-  const [peerMeta, setPeerMeta]           = useState({});
+  const [peerMeta, setPeerMeta] = useState({});
   const [wbPermissions, setWbPermissions] = useState({});
-  const [wbAllowed, setWbAllowed]         = useState(true);
+  const [wbAllowed, setWbAllowed] = useState(true);
 
   // ── Private room ─────────────────────────────────────────────────────────────
-  const [roomInfo, setRoomInfo]         = useState(null);
-  const [knockStatus, setKnockStatus]   = useState(null);
+  const [roomInfo, setRoomInfo] = useState(null);
+  const [knockStatus, setKnockStatus] = useState(null);
   const [knockRequests, setKnockRequests] = useState([]);
   const hasJoined = useRef(false);
 
   // ── PiP ──────────────────────────────────────────────────────────────────────
   const [pipVisible, setPipVisible] = useState(false);
+  const [docPipWindow, setDocPipWindow] = useState(null);
   const pipDismissedRef = useRef(false);
 
   // ── Classroom session tracking ───────────────────────────────────────────────
@@ -96,7 +98,7 @@ export default function Room() {
   useEffect(() => {
     const onVis = () => {
       if (document.hidden) {
-        if (!pipDismissedRef.current) setPipVisible(true);
+        if (!pipDismissedRef.current && !docPipWindow) setPipVisible(true);
       } else {
         setPipVisible(false);
         pipDismissedRef.current = false;
@@ -104,7 +106,7 @@ export default function Room() {
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
-  }, []);
+  }, [docPipWindow]);
 
   useEffect(() => {
     const onKicked = () => setKicked(true);
@@ -121,7 +123,7 @@ export default function Room() {
         if (!Array.isArray(sessions)) return;
         const active = sessions.find(s => s.roomId === roomId && !s.endedAt);
         if (active) sessionIdRef.current = active._id;
-      }).catch(() => {});
+      }).catch(() => { });
   }, [classroomId, isHost, nameConfirmed]);
 
   const saveSessionData = useCallback(async () => {
@@ -133,7 +135,7 @@ export default function Room() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endedAt: new Date().toISOString(), chatLog: chatPayload }),
-    }).catch(() => {});
+    }).catch(() => { });
   }, [classroomId, messages]);
 
   // ── Socket init ──────────────────────────────────────────────────────────────
@@ -147,17 +149,17 @@ export default function Room() {
       setMessages(p => [...p, msg]);
       setChatOpen(prev => { if (!prev) setUnread(u => u + 1); return prev; });
     });
-    s.on('knock-request',  ({ socketId, userName: kName }) =>
+    s.on('knock-request', ({ socketId, userName: kName }) =>
       setKnockRequests(p => [...p, { socketId, userName: kName }]));
     s.on('knock-accepted', () => setKnockStatus('accepted'));
     s.on('knock-rejected', () => setKnockStatus('rejected'));
 
     // Host controls
-    s.on('force-mute',       () => window.dispatchEvent(new Event('qm-force-mute')));
-    s.on('force-unmute',     () => window.dispatchEvent(new Event('qm-force-unmute')));
+    s.on('force-mute', () => window.dispatchEvent(new Event('qm-force-mute')));
+    s.on('force-unmute', () => window.dispatchEvent(new Event('qm-force-unmute')));
     s.on('force-stop-video', () => window.dispatchEvent(new Event('qm-force-stop-video')));
-    s.on('wb-permission',    ({ allowed }) => setWbAllowed(allowed));
-    s.on('lower-hand',       () => setHandRaised(false));
+    s.on('wb-permission', ({ allowed }) => setWbAllowed(allowed));
+    s.on('lower-hand', () => setHandRaised(false));
 
     // Reactions from peers
     s.on('peer-reaction', ({ emoji, x, y }) => spawnReaction(emoji, x, y));
@@ -167,9 +169,9 @@ export default function Room() {
       setPeerMeta(m => ({ ...m, [socketId]: { ...m[socketId], audioMuted: !enabled } })));
     s.on('peer-video-toggle', ({ socketId, enabled }) =>
       setPeerMeta(m => ({ ...m, [socketId]: { ...m[socketId], videoStopped: !enabled } })));
-    s.on('peer-hand-raise',   ({ socketId, userName: n }) =>
+    s.on('peer-hand-raise', ({ socketId, userName: n }) =>
       setPeerMeta(m => ({ ...m, [socketId]: { ...m[socketId], handRaised: true, userName: n } })));
-    s.on('peer-hand-lower',   ({ socketId }) =>
+    s.on('peer-hand-lower', ({ socketId }) =>
       setPeerMeta(m => ({ ...m, [socketId]: { ...m[socketId], handRaised: false } })));
     s.on('user-left', ({ socketId }) =>
       setPeerMeta(m => { const n = { ...m }; delete n[socketId]; return n; }));
@@ -179,7 +181,7 @@ export default function Room() {
 
     // Poll/QnA badges when panels are closed
     s.on('poll-new', () => { setPollBadge(b => b + 1); });
-    s.on('qna-new',  () => { setQnaBadge(b => b + 1);  });
+    s.on('qna-new', () => { setQnaBadge(b => b + 1); });
 
     return () => s.disconnect();
   }, [nameConfirmed]);
@@ -194,7 +196,7 @@ export default function Room() {
 
   // ── WebRTC ────────────────────────────────────────────────────────────────────
   const { localStream, peers, audioEnabled, videoEnabled, screenSharing,
-          initLocalStream, toggleAudio, toggleVideo, toggleScreenShare, cleanup,
+    initLocalStream, toggleAudio, toggleVideo, toggleScreenShare, cleanup,
   } = useWebRTC({ socket, roomId, userId, userName });
 
   // ── Meeting recorder (admin only) ─────────────────────────────────────────
@@ -205,15 +207,15 @@ export default function Room() {
 
   // ── Host force controls ───────────────────────────────────────────────────────
   useEffect(() => {
-    const onFM  = () => { if (audioEnabled)  toggleAudio(); };
-    const onFU  = () => { if (!audioEnabled) toggleAudio(); };
-    const onFSV = () => { if (videoEnabled)  toggleVideo(); };
-    window.addEventListener('qm-force-mute',       onFM);
-    window.addEventListener('qm-force-unmute',     onFU);
+    const onFM = () => { if (audioEnabled) toggleAudio(); };
+    const onFU = () => { if (!audioEnabled) toggleAudio(); };
+    const onFSV = () => { if (videoEnabled) toggleVideo(); };
+    window.addEventListener('qm-force-mute', onFM);
+    window.addEventListener('qm-force-unmute', onFU);
     window.addEventListener('qm-force-stop-video', onFSV);
     return () => {
-      window.removeEventListener('qm-force-mute',       onFM);
-      window.removeEventListener('qm-force-unmute',     onFU);
+      window.removeEventListener('qm-force-mute', onFM);
+      window.removeEventListener('qm-force-unmute', onFU);
       window.removeEventListener('qm-force-stop-video', onFSV);
     };
   }, [audioEnabled, videoEnabled, toggleAudio, toggleVideo]);
@@ -271,16 +273,67 @@ export default function Room() {
     navigate(classroomId ? `/classroom/${classroomId}` : '/');
   }, [saveSessionData, cleanup, roomId, classroomId]);
 
-  const handlePin      = useCallback(sid  => setPinnedId(p => p === sid ? null : sid), []);
-  const handleKickUser = useCallback(sid  => socketRef.current?.emit('kick-user', { roomId, targetSocketId: sid }), [roomId]);
-  const admitUser      = sid => { socketRef.current?.emit('admit-user',  { roomId, socketId: sid }); setKnockRequests(p => p.filter(k => k.socketId !== sid)); };
-  const rejectUser     = sid => { socketRef.current?.emit('reject-user', { roomId, socketId: sid }); setKnockRequests(p => p.filter(k => k.socketId !== sid)); };
+  const handlePin = useCallback(sid => setPinnedId(p => p === sid ? null : sid), []);
+  const handleKickUser = useCallback(sid => socketRef.current?.emit('kick-user', { roomId, targetSocketId: sid }), [roomId]);
+  const admitUser = sid => { socketRef.current?.emit('admit-user', { roomId, socketId: sid }); setKnockRequests(p => p.filter(k => k.socketId !== sid)); };
+  const rejectUser = sid => { socketRef.current?.emit('reject-user', { roomId, socketId: sid }); setKnockRequests(p => p.filter(k => k.socketId !== sid)); };
   const handleCopyLink = () => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); };
 
   const sendMessage = useCallback(text => {
     if (!socket || !text.trim()) return;
     socket.emit('chat-message', { roomId, message: text, userName, userId });
   }, [socket, roomId, userName, userId]);
+
+  const handleToggleDocPip = async () => {
+    if (docPipWindow) {
+      docPipWindow.close();
+      return;
+    }
+
+    if (!('documentPictureInPicture' in window)) {
+      alert("Document Picture-in-Picture API is not supported in your browser.");
+      return;
+    }
+
+    try {
+      const pipWin = await window.documentPictureInPicture.requestWindow({
+        width: 400,
+        height: 500,
+      });
+
+      // Copy styles
+      [...document.styleSheets].forEach((styleSheet) => {
+        try {
+          const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
+          const style = document.createElement('style');
+          style.textContent = cssRules;
+          pipWin.document.head.appendChild(style);
+        } catch (e) {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.type = styleSheet.type;
+          link.media = styleSheet.media;
+          link.href = styleSheet.href;
+          pipWin.document.head.appendChild(link);
+        }
+      });
+
+      pipWin.document.body.style.margin = '0';
+      pipWin.document.body.style.padding = '0';
+      pipWin.document.body.style.backgroundColor = '#1e1e1e';
+      pipWin.document.body.style.color = '#ffffff';
+      pipWin.document.body.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+      pipWin.document.body.style.overflow = 'hidden';
+
+      pipWin.addEventListener('pagehide', () => {
+        setDocPipWindow(null);
+      });
+
+      setDocPipWindow(pipWin);
+    } catch (err) {
+      console.error('Failed to open Document PiP:', err);
+    }
+  };
 
   const handleToggleChat = useCallback(() => {
     setChatOpen(prev => { if (!prev) setUnread(0); return !prev; });
@@ -290,7 +343,7 @@ export default function Room() {
     setHandRaised(prev => {
       const next = !prev;
       if (next) socketRef.current?.emit('raise-hand', { roomId, userName });
-      else      socketRef.current?.emit('lower-hand', { roomId });
+      else socketRef.current?.emit('lower-hand', { roomId });
       return next;
     });
   }, [roomId, userName]);
@@ -298,9 +351,9 @@ export default function Room() {
   // ── Enriched peers ────────────────────────────────────────────────────────────
   const enrichedPeers = peers.map(p => ({
     ...p,
-    audioMuted:   peerMeta[p.socketId]?.audioMuted   || false,
+    audioMuted: peerMeta[p.socketId]?.audioMuted || false,
     videoStopped: peerMeta[p.socketId]?.videoStopped || false,
-    handRaised:   peerMeta[p.socketId]?.handRaised   || false,
+    handRaised: peerMeta[p.socketId]?.handRaised || false,
   }));
 
   // ── Wait screens ──────────────────────────────────────────────────────────────
@@ -353,7 +406,7 @@ export default function Room() {
     ...peers.map(p => ({ ...p, isLocal: false })),
   ];
   const pinnedP = pinnedId ? allParticipants.find(p => p.socketId === pinnedId) : null;
-  const others  = pinnedP  ? allParticipants.filter(p => p.socketId !== pinnedId) : allParticipants;
+  const others = pinnedP ? allParticipants.filter(p => p.socketId !== pinnedId) : allParticipants;
   const n = allParticipants.length;
   const gridClass = n === 1 ? styles.grid1 : n === 2 ? styles.grid2 : n <= 4 ? styles.grid4 : styles.gridMany;
   const raisedHands = enrichedPeers.filter(p => p.handRaised);
@@ -390,7 +443,7 @@ export default function Room() {
         <div className={styles.topRight}>
           {/* Layout switcher */}
           <div className={styles.layoutSwitch}>
-            {[['grid','⊞'],['spotlight','◉'],['sidebar','⊡']].map(([l, icon]) => (
+            {[['grid', '⊞'], ['spotlight', '◉'], ['sidebar', '⊡']].map(([l, icon]) => (
               <button key={l}
                 className={`${styles.layoutBtn} ${layout === l ? styles.layoutBtnActive : ''}`}
                 onClick={() => { setLayout(l); setPinnedId(null); }} title={l}>
@@ -400,8 +453,8 @@ export default function Room() {
           </div>
           {recording && (
             <span className={styles.recBadge}>
-              <span className={styles.recDot}/>
-              {String(Math.floor(duration/60)).padStart(2,'0')}:{String(duration%60).padStart(2,'0')}
+              <span className={styles.recDot} />
+              {String(Math.floor(duration / 60)).padStart(2, '0')}:{String(duration % 60).padStart(2, '0')}
             </span>
           )}
           <div className={styles.liveDot} />
@@ -429,7 +482,7 @@ export default function Room() {
             <div key={k.socketId} className={styles.knockItem}>
               <span>🔔 <strong>{k.userName}</strong> wants to join</span>
               <div className={styles.knockBtns}>
-                <button className={styles.admitBtn}  onClick={() => admitUser(k.socketId)}>Admit</button>
+                <button className={styles.admitBtn} onClick={() => admitUser(k.socketId)}>Admit</button>
                 <button className={styles.rejectBtn} onClick={() => rejectUser(k.socketId)}>Deny</button>
               </div>
             </div>
@@ -442,13 +495,15 @@ export default function Room() {
         // Spotlight: biggest tile top, strip below
         <div className={styles.spotlightLayout}>
           <div className={styles.spotlightMain}>
-            {(() => { const sp = pinnedP || allParticipants[0]; return (
-              <VideoTile stream={sp.stream} userName={sp.userName} isLocal={sp.isLocal}
-                audioEnabled={sp.isLocal ? audioEnabled : true}
-                videoEnabled={sp.isLocal ? videoEnabled : true}
-                isPinned={!!pinnedP} onPin={() => handlePin(sp.socketId)}
-                isHost={isHost} onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)} />
-            );})()}
+            {(() => {
+              const sp = pinnedP || allParticipants[0]; return (
+                <VideoTile stream={sp.stream} userName={sp.userName} isLocal={sp.isLocal}
+                  audioEnabled={sp.isLocal ? audioEnabled : true}
+                  videoEnabled={sp.isLocal ? videoEnabled : true}
+                  isPinned={!!pinnedP} onPin={() => handlePin(sp.socketId)}
+                  isHost={isHost} onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)} />
+              );
+            })()}
           </div>
           <div className={styles.spotlightStrip}>
             {allParticipants.slice(pinnedP ? 0 : 1).filter(p => p.socketId !== (pinnedP?.socketId)).map(p => (
@@ -466,13 +521,15 @@ export default function Room() {
         // Sidebar: main + right sidebar
         <div className={styles.pinnedLayout}>
           <div className={styles.pinnedMain}>
-            {(() => { const sp = pinnedP || allParticipants[0]; return (
-              <VideoTile stream={sp.stream} userName={sp.userName} isLocal={sp.isLocal}
-                audioEnabled={sp.isLocal ? audioEnabled : true}
-                videoEnabled={sp.isLocal ? videoEnabled : true}
-                isPinned={!!pinnedP} onPin={() => handlePin(sp.socketId)}
-                isHost={isHost} onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)} />
-            );})()}
+            {(() => {
+              const sp = pinnedP || allParticipants[0]; return (
+                <VideoTile stream={sp.stream} userName={sp.userName} isLocal={sp.isLocal}
+                  audioEnabled={sp.isLocal ? audioEnabled : true}
+                  videoEnabled={sp.isLocal ? videoEnabled : true}
+                  isPinned={!!pinnedP} onPin={() => handlePin(sp.socketId)}
+                  isHost={isHost} onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)} />
+              );
+            })()}
           </div>
           <div className={styles.pinnedSidebar}>
             {allParticipants.filter(p => p.socketId !== (pinnedP?.socketId || allParticipants[0]?.socketId)).map(p => (
@@ -546,12 +603,14 @@ export default function Room() {
         onToggleBreakout={() => setBreakoutOpen(o => !o)}
         onTogglePoll={() => { setPollOpen(o => !o); setPollBadge(0); }}
         onToggleQnA={() => { setQnaOpen(o => !o); setQnaBadge(0); }}
+        docPipOpen={!!docPipWindow}
+        onToggleDocPip={handleToggleDocPip}
       />
 
       {/* ── Emoji reaction picker ── */}
       {reactionOpen && (
         <div className={styles.reactionPicker}>
-          {['👍','❤️','😂','😮','👏','🔥','🎉','😢','💯','🤔'].map(e => (
+          {['👍', '❤️', '😂', '😮', '👏', '🔥', '🎉', '😢', '💯', '🤔'].map(e => (
             <button key={e} className={styles.reactionBtn} onClick={() => sendReaction(e)}>{e}</button>
           ))}
         </div>
@@ -585,15 +644,34 @@ export default function Room() {
           onClose={() => setSettingsOpen(false)} />
       )}
 
-      {/* ── PiP overlay ── */}
-      <PipWindow
-        visible={pipVisible}
-        localStream={localStream} peers={peers} pinnedId={pinnedId}
-        localUserName={userName} audioEnabled={audioEnabled} videoEnabled={videoEnabled}
-        onPin={handlePin} onUnpin={() => setPinnedId(null)}
-        onDismiss={() => { pipDismissedRef.current = true; setPipVisible(false); }}
-        onReturnToMeet={() => window.focus()}
-      />
+      {/* ── PiP overlay (in-tab or Document PiP) ── */}
+      {docPipWindow ? (
+        <DocumentPipPortal pipWindow={docPipWindow}>
+          <PipWindow
+            visible={true} isDocPip={true}
+            localStream={localStream} peers={peers} pinnedId={pinnedId}
+            localUserName={userName} audioEnabled={audioEnabled} videoEnabled={videoEnabled}
+            onPin={handlePin} onUnpin={() => setPinnedId(null)}
+            onDismiss={() => docPipWindow.close()}
+            onReturnToMeet={() => window.focus()}
+            onToggleAudio={toggleAudio}
+            onToggleVideo={toggleVideo}
+            onLeave={handleLeave}
+          />
+        </DocumentPipPortal>
+      ) : (
+        <PipWindow
+          visible={pipVisible} isDocPip={false}
+          localStream={localStream} peers={peers} pinnedId={pinnedId}
+          localUserName={userName} audioEnabled={audioEnabled} videoEnabled={videoEnabled}
+          onPin={handlePin} onUnpin={() => setPinnedId(null)}
+          onDismiss={() => { pipDismissedRef.current = true; setPipVisible(false); }}
+          onReturnToMeet={() => window.focus()}
+          onToggleAudio={toggleAudio}
+          onToggleVideo={toggleVideo}
+          onLeave={handleLeave}
+        />
+      )}
 
       {/* ── Transcribe panel ── */}
       {transcribeOpen && (
