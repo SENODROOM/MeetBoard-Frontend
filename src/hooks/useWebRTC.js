@@ -8,6 +8,76 @@ const ICE = {
   ],
 };
 
+// ── Audio enhancement pipeline ───────────────────────────────────────────────
+// Applies a Web Audio API processing chain on top of the raw getUserMedia stream:
+//   source → highpass (cut rumble <80Hz) → lowpass (cut harshness >8kHz)
+//          → presence boost (peaking EQ +3dB @ 3kHz) → dynamics compressor
+//          → output gain → MediaStreamDestination
+async function buildEnhancedAudioStream(rawStream) {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 48000,
+    });
+
+    const source = audioCtx.createMediaStreamSource(rawStream);
+
+    // 1. High-pass filter — removes low-frequency rumble / background hum
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 80;
+    hp.Q.value = 0.7;
+
+    // 2. Low-pass filter — removes harsh high-frequency noise
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 8000;
+    lp.Q.value = 0.7;
+
+    // 3. Presence boost — adds clarity / intelligibility around 3 kHz
+    const presence = audioCtx.createBiquadFilter();
+    presence.type = "peaking";
+    presence.frequency.value = 3000;
+    presence.gain.value = 3;
+    presence.Q.value = 1.0;
+
+    // 4. Dynamics compressor — levels out volume, reduces sudden loud spikes
+    const compressor = audioCtx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+    compressor.knee.setValueAtTime(10, audioCtx.currentTime);
+    compressor.ratio.setValueAtTime(4, audioCtx.currentTime);
+    compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+    compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+    // 5. Output gain — slight reduction to avoid clipping after compression
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.85;
+
+    // 6. Destination MediaStream
+    const dest = audioCtx.createMediaStreamDestination();
+
+    // Wire the chain
+    source.connect(hp);
+    hp.connect(lp);
+    lp.connect(presence);
+    presence.connect(compressor);
+    compressor.connect(gainNode);
+    gainNode.connect(dest);
+
+    // Build final stream: enhanced audio + original video tracks
+    const enhancedStream = new MediaStream();
+    dest.stream.getAudioTracks().forEach((t) => enhancedStream.addTrack(t));
+    rawStream.getVideoTracks().forEach((t) => enhancedStream.addTrack(t));
+
+    // Attach AudioContext reference for cleanup
+    enhancedStream._audioCtx = audioCtx;
+
+    return enhancedStream;
+  } catch (err) {
+    console.warn("Audio enhancement failed, falling back to raw stream:", err);
+    return rawStream;
+  }
+}
+
 export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   const localStreamRef = useRef(null);
   const camStreamRef = useRef(null);
@@ -33,8 +103,6 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   }, [userName]);
 
   // ── Renegotiate with one peer after addTrack / removeTrack ───────────────────
-  // WebRTC does NOT automatically tell the remote side about new/removed tracks.
-  // We must create a new offer and send it through signalling every time.
   const renegotiate = useCallback(async (sid) => {
     const pc = peersRef.current[sid];
     const s = socketRef.current;
@@ -53,23 +121,40 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     }
   }, []);
 
-  // ── Init camera / mic ────────────────────────────────────────────────────────
+  // ── Init camera / mic with noise cancellation + audio enhancement ─────────
   const initLocalStream = useCallback(async () => {
     try {
-      const s = await navigator.mediaDevices.getUserMedia({
+      // Request with hardware-level noise suppression hints
+      const rawStream = await navigator.mediaDevices.getUserMedia({
         video: true,
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+          channelCount: 1,
+        },
       });
+
+      // Apply software-level audio enhancement pipeline
+      const s = await buildEnhancedAudioStream(rawStream);
+
       localStreamRef.current = s;
       camStreamRef.current = s;
       setLocalStream(s);
       return s;
     } catch {
       try {
-        const s = await navigator.mediaDevices.getUserMedia({
+        // Fallback: audio only if camera unavailable
+        const rawStream = await navigator.mediaDevices.getUserMedia({
           video: false,
-          audio: true,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
         });
+        const s = await buildEnhancedAudioStream(rawStream);
         localStreamRef.current = s;
         camStreamRef.current = s;
         setLocalStream(s);
@@ -107,9 +192,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
           .forEach((t) => pc.addTrack(t, localStreamRef.current));
       }
 
-      // If we are already screen-sharing when this new peer joins, add the screen
-      // track NOW — before we call createOffer — so it is included in the very
-      // first offer and no separate renegotiation is needed for this peer.
+      // If already screen-sharing when new peer joins, include screen track
       if (screenStreamRef.current) {
         const screenTrack = screenStreamRef.current.getVideoTracks()[0];
         if (screenTrack) {
@@ -128,24 +211,53 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         }
       };
 
-      // Separate incoming tracks: track 1 = camera, track 2 = screen share
       const remoteStream = new MediaStream();
       const remoteScreenStream = new MediaStream();
-      let videoTrackCount = 0;
+      // Counts only NEW video tracks — deduplicated so renegotiation re-fires
+      // don't increment the counter and misroute the camera track to screen.
+      let newVideoTrackCount = 0;
 
       pc.ontrack = ({ track }) => {
+        // ── Deduplication ────────────────────────────────────────────────────
+        // Renegotiation re-fires ontrack for already-placed tracks.
+        // Refresh peer state (so screenStream ref updates) but don't re-route.
+        const allKnown = [
+          ...remoteStream.getTracks(),
+          ...remoteScreenStream.getTracks(),
+        ];
+        if (allKnown.some((t) => t.id === track.id)) {
+          const hasScreen = remoteScreenStream
+            .getVideoTracks()
+            .some((t) => t.readyState !== "ended");
+          setPeers((prev) => {
+            const updated = {
+              socketId: sid,
+              userName: remoteUserName,
+              stream: remoteStream,
+              screenStream: hasScreen ? remoteScreenStream : null,
+            };
+            const ex = prev.find((p) => p.socketId === sid);
+            if (ex) return prev.map((p) => (p.socketId === sid ? updated : p));
+            return [...prev, updated];
+          });
+          return;
+        }
+
+        // ── Route new track ──────────────────────────────────────────────────
         if (track.kind === "audio") {
           remoteStream.addTrack(track);
         } else {
-          videoTrackCount += 1;
-          if (videoTrackCount === 1) {
+          newVideoTrackCount += 1;
+          if (newVideoTrackCount === 1) {
             remoteStream.addTrack(track); // first video = camera
           } else {
-            remoteScreenStream.addTrack(track); // second video = screen
+            remoteScreenStream.addTrack(track); // second video = screen share
           }
         }
 
-        const hasScreen = remoteScreenStream.getVideoTracks().length > 0;
+        const hasScreen = remoteScreenStream
+          .getVideoTracks()
+          .some((t) => t.readyState !== "ended");
         setPeers((prev) => {
           const updated = {
             socketId: sid,
@@ -209,8 +321,6 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         pc = createPeerConnection(from, rName);
       }
       try {
-        // Renegotiation offers can arrive while we already have a local offer
-        // (the remote peer added their screen track). Roll back our local offer first.
         if (pc.signalingState === "have-local-offer") {
           await pc.setLocalDescription({ type: "rollback" });
         }
@@ -245,6 +355,9 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     const handleKicked = () => window.dispatchEvent(new Event("qm-kicked"));
 
     const handlePeerScreenStopped = ({ socketId }) => {
+      // Null out the screenStream so the UI removes the screen tile.
+      // The streamRole map lives in the pc closure and will naturally reset
+      // when the peer starts a new screen share (new stream ID = new role entry).
       setPeers((prev) =>
         prev.map((p) =>
           p.socketId === socketId ? { ...p, screenStream: null } : p,
@@ -298,14 +411,11 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   // ── Screen share toggle ──────────────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
     if (screenSharing) {
-      // ── STOP ────────────────────────────────────────────────────────────────
       screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
       setScreenStream(null);
       setScreenSharing(false);
 
-      // Remove screen sender from every peer then renegotiate so the remote
-      // side removes the track from its stream.
       for (const sid of Object.keys(peersRef.current)) {
         const pc = peersRef.current[sid];
         const sender = peerScreenSendersRef.current[sid];
@@ -321,7 +431,6 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       if (socketRef.current)
         socketRef.current.emit("screen-share-stopped", { roomId });
     } else {
-      // ── START ────────────────────────────────────────────────────────────────
       try {
         const ss = await navigator.mediaDevices.getDisplayMedia({
           video: { frameRate: { ideal: 30 } },
@@ -331,20 +440,16 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         screenStreamRef.current = ss;
         const screenTrack = ss.getVideoTracks()[0];
 
-        // Add screen track to each connected peer then renegotiate.
-        // THE CRITICAL PART: without renegotiate() the remote peer's ontrack
-        // never fires — addTrack alone is completely silent on an established connection.
         for (const sid of Object.keys(peersRef.current)) {
           const pc = peersRef.current[sid];
           const sender = pc.addTrack(screenTrack, ss);
           peerScreenSendersRef.current[sid] = sender;
-          await renegotiate(sid); // ← sends new offer so remote ontrack fires
+          await renegotiate(sid);
         }
 
         setScreenStream(ss);
         setScreenSharing(true);
 
-        // Browser "Stop sharing" button
         screenTrack.onended = async () => {
           screenStreamRef.current?.getTracks().forEach((t) => t.stop());
           screenStreamRef.current = null;
@@ -377,6 +482,10 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     Object.values(peersRef.current).forEach((pc) => pc.close());
     peersRef.current = {};
     peerScreenSendersRef.current = {};
+    // Close the Web Audio processing context to free resources
+    if (localStreamRef.current?._audioCtx) {
+      localStreamRef.current._audioCtx.close().catch(() => {});
+    }
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     screenStreamRef.current?.getTracks().forEach((t) => t.stop());
     camStreamRef.current = null;

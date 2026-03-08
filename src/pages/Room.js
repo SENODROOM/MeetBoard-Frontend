@@ -90,6 +90,11 @@ export default function Room() {
   const [wbPermissions, setWbPermissions] = useState({});
   const [wbAllowed, setWbAllowed] = useState(true);
 
+  // ── Whiteboard active drawing indicator ──────────────────────────────────────
+  // True when a remote peer is currently drawing on the whiteboard
+  const [wbActive, setWbActive] = useState(false);
+  const wbActiveTimerRef = useRef(null);
+
   // ── Private room ─────────────────────────────────────────────────────────────
   const [roomInfo, setRoomInfo] = useState(null);
   const [knockStatus, setKnockStatus] = useState(null);
@@ -125,7 +130,7 @@ export default function Room() {
     return () => window.removeEventListener("qm-kicked", onKicked);
   }, []);
 
-  // Classroom session lookup — safe because isHost/nameConfirmed already declared
+  // Classroom session lookup
   useEffect(() => {
     if (!classroomId || !isHost || !nameConfirmed) return;
     fetch(`${API}/api/classrooms/${classroomId}/sessions`)
@@ -251,7 +256,24 @@ export default function Room() {
       setQnaBadge((b) => b + 1);
     });
 
-    return () => s.disconnect();
+    // ── Whiteboard drawing indicator ─────────────────────────────────────────
+    // A peer started drawing — light up the whiteboard button green
+    s.on("wb-drawing-start", () => {
+      setWbActive(true);
+      clearTimeout(wbActiveTimerRef.current);
+      // Safety auto-clear in case wb-drawing-stop is missed
+      wbActiveTimerRef.current = setTimeout(() => setWbActive(false), 3000);
+    });
+    // Peer stopped drawing — turn the indicator off
+    s.on("wb-drawing-stop", () => {
+      clearTimeout(wbActiveTimerRef.current);
+      setWbActive(false);
+    });
+
+    return () => {
+      clearTimeout(wbActiveTimerRef.current);
+      s.disconnect();
+    };
   }, [nameConfirmed, playJoin, playLeave, playMessage, playKnock]);
 
   // ── Room info ─────────────────────────────────────────────────────────────────
@@ -568,8 +590,6 @@ export default function Room() {
     );
 
   // ── Layout helpers ────────────────────────────────────────────────────────────
-  // Build participant list.
-  // When screen sharing, add a dedicated screen tile AFTER the local camera tile.
   const allParticipants = [
     {
       socketId: "local",
@@ -611,7 +631,6 @@ export default function Room() {
     ? allParticipants.filter((p) => p.socketId !== pinnedId)
     : allParticipants;
   const n = allParticipants.length;
-  // Responsive grid: tiles fill available space cleanly for every count
   const gridClass = (() => {
     if (n === 1) return styles.grid1;
     if (n === 2) return styles.grid2;
@@ -622,18 +641,15 @@ export default function Room() {
   })();
   const raisedHands = enrichedPeers.filter((p) => p.handRaised);
 
-  // ── Main render ───────────────────────────────────────────────────────────────
-
-  // Helper: get correct audio/video enabled state for any participant tile
   const tileAudio = (p) => {
     if (p.isLocal) return audioEnabled;
-    if (p.isScreen) return true; // screen tile has no audio
+    if (p.isScreen) return true;
     const meta = peerMeta[p.socketId];
     return meta ? !meta.audioMuted : true;
   };
   const tileVideo = (p) => {
     if (p.isLocal) return videoEnabled;
-    if (p.isScreen) return true; // screen share is always "video on"
+    if (p.isScreen) return true;
     const meta = peerMeta[p.socketId];
     return meta ? !meta.videoStopped : true;
   };
@@ -760,7 +776,6 @@ export default function Room() {
 
       {/* ── Video area ── */}
       {layout === "spotlight" && allParticipants.length > 0 ? (
-        // Spotlight: biggest tile top, strip below
         <div className={styles.spotlightLayout}>
           <div className={styles.spotlightMain}>
             {(() => {
@@ -804,7 +819,6 @@ export default function Room() {
           </div>
         </div>
       ) : layout === "sidebar" ? (
-        // Sidebar: main + right sidebar
         <div className={styles.pinnedLayout}>
           <div className={styles.pinnedMain}>
             {(() => {
@@ -850,7 +864,6 @@ export default function Room() {
           </div>
         </div>
       ) : pinnedP ? (
-        // Pinned tile layout
         <div className={styles.pinnedLayout}>
           <div className={styles.pinnedMain}>
             <VideoTile
@@ -889,7 +902,6 @@ export default function Room() {
           )}
         </div>
       ) : (
-        // Default grid
         <div className={`${styles.videoGrid} ${gridClass}`}>
           {allParticipants.map((p) => (
             <VideoTile
@@ -926,6 +938,7 @@ export default function Room() {
         qnaOpen={qnaOpen}
         pollBadge={pollOpen ? 0 : pollBadge}
         qnaBadge={qnaOpen ? 0 : qnaBadge}
+        wbActive={wbActive}
         onToggleAudio={toggleAudio}
         onToggleVideo={toggleVideo}
         onToggleScreen={toggleScreenShare}

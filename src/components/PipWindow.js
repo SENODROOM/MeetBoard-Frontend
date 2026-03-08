@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import styles from './PipWindow.module.css';
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import styles from "./PipWindow.module.css";
 
 /*
  * PipWindow
@@ -19,6 +19,15 @@ import styles from './PipWindow.module.css';
  *   │ 🎙 📷  ·  N participants   │
  *   └────────────────────────────┘
  */
+
+// ── Helper: check if a peer's video is live and enabled ──────────────────────
+function peerHasVideo(peer) {
+  if (!peer?.stream) return false;
+  const tracks = peer.stream.getVideoTracks();
+  if (!tracks.length) return false;
+  return tracks.some((t) => t.enabled && t.readyState !== "ended");
+}
+
 export default function PipWindow({
   visible,
   localStream,
@@ -43,7 +52,8 @@ export default function PipWindow({
   const [hovered, setHovered] = useState(null);
 
   // pinned peer gets main slot; fall back to first remote
-  const mainPeer = peers.find((p) => p.socketId === pinnedId) || peers[0] || null;
+  const mainPeer =
+    peers.find((p) => p.socketId === pinnedId) || peers[0] || null;
   const stripPeers = peers.filter((p) => p !== mainPeer);
 
   // Reset to default position whenever window opens
@@ -52,37 +62,64 @@ export default function PipWindow({
   }, [visible]);
 
   // Drag logic
-  const onMouseDown = useCallback((e) => {
-    if (isDocPip) return;
-    if (e.target.closest('button')) return;
-    dragging.current = true;
-    const r = pipRef.current.getBoundingClientRect();
-    dragOff.current = { x: e.clientX - r.left, y: e.clientY - r.top };
-    e.preventDefault();
-  }, [isDocPip]);
+  const onMouseDown = useCallback(
+    (e) => {
+      if (isDocPip) return;
+      if (e.target.closest("button")) return;
+      dragging.current = true;
+      const r = pipRef.current.getBoundingClientRect();
+      dragOff.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+      e.preventDefault();
+    },
+    [isDocPip],
+  );
 
   useEffect(() => {
     const onMove = (e) => {
       if (!dragging.current || !pipRef.current) return;
       setPos({
-        x: Math.max(0, Math.min(e.clientX - dragOff.current.x, window.innerWidth - pipRef.current.offsetWidth)),
-        y: Math.max(0, Math.min(e.clientY - dragOff.current.y, window.innerHeight - pipRef.current.offsetHeight)),
+        x: Math.max(
+          0,
+          Math.min(
+            e.clientX - dragOff.current.x,
+            window.innerWidth - pipRef.current.offsetWidth,
+          ),
+        ),
+        y: Math.max(
+          0,
+          Math.min(
+            e.clientY - dragOff.current.y,
+            window.innerHeight - pipRef.current.offsetHeight,
+          ),
+        ),
       });
     };
-    const onUp = () => { dragging.current = false; };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    const onUp = () => {
+      dragging.current = false;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
     };
   }, []);
 
   const posStyle = isDocPip
-    ? { width: '100vw', height: '100vh', left: 0, top: 0, right: 'auto', bottom: 'auto', border: 'none', borderRadius: 0, boxShadow: 'none' }
-    : (pos.x !== null
-      ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' }
-      : {});
+    ? {
+        width: "100vw",
+        height: "100vh",
+        left: 0,
+        top: 0,
+        right: "auto",
+        bottom: "auto",
+        border: "none",
+        borderRadius: 0,
+        boxShadow: "none",
+      }
+    : pos.x !== null
+      ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" }
+      : {};
 
   return (
     <div
@@ -93,10 +130,17 @@ export default function PipWindow({
     >
       {/* Header */}
       <div className={styles.header}>
-        <span className={styles.logo}><img src="/logo.png" alt="QuantumMeet" className={styles.logoImage} /> QuantumMeet</span>
+        <span className={styles.logo}>
+          <img src="/logo.png" alt="QuantumMeet" className={styles.logoImage} />{" "}
+          QuantumMeet
+        </span>
         <div className={styles.headerBtns}>
-          <button className={styles.returnBtn} onClick={onReturnToMeet}>↩ Return</button>
-          <button className={styles.closeBtn} onClick={onDismiss}>✕</button>
+          <button className={styles.returnBtn} onClick={onReturnToMeet}>
+            ↩ Return
+          </button>
+          <button className={styles.closeBtn} onClick={onDismiss}>
+            ✕
+          </button>
         </div>
       </div>
 
@@ -109,12 +153,17 @@ export default function PipWindow({
             userName={mainPeer.userName}
             muted={false}
             mirrored={false}
+            videoEnabled={peerHasVideo(mainPeer)}
             isPinned={pinnedId === mainPeer.socketId}
             hovered={hovered === mainPeer.socketId}
             onEnter={() => setHovered(mainPeer.socketId)}
             onLeave={() => setHovered(null)}
-            onPin={() => pinnedId === mainPeer.socketId ? onUnpin?.() : onPin?.(mainPeer.socketId)}
-            pinLabel={pinnedId === mainPeer.socketId ? 'Unpin' : 'Pin'}
+            onPin={() =>
+              pinnedId === mainPeer.socketId
+                ? onUnpin?.()
+                : onPin?.(mainPeer.socketId)
+            }
+            pinLabel={pinnedId === mainPeer.socketId ? "Unpin" : "Pin"}
             big
           />
         ) : (
@@ -126,26 +175,39 @@ export default function PipWindow({
 
         {/* Local self-view — corner */}
         <div
-          className={`${styles.selfCorner} ${pinnedId === 'local' ? styles.selfPinned : ''}`}
-          onMouseEnter={() => setHovered('local')}
+          className={`${styles.selfCorner} ${pinnedId === "local" ? styles.selfPinned : ""}`}
+          onMouseEnter={() => setHovered("local")}
           onMouseLeave={() => setHovered(null)}
         >
-          <VideoEl stream={localStream} muted mirrored />
+          <VideoEl
+            stream={localStream}
+            muted
+            mirrored
+            videoEnabled={videoEnabled}
+          />
           {!videoEnabled && (
             <div className={styles.avatar}>
-              {localUserName?.[0]?.toUpperCase() || '?'}
+              {localUserName?.[0]?.toUpperCase() || "?"}
             </div>
           )}
           <div className={styles.selfLabel}>
-            {!audioEnabled && '🔇 '}{localUserName}
+            {!audioEnabled && "🔇 "}
+            {localUserName}
           </div>
-          {hovered === 'local' && (
+          {hovered === "local" && (
             <div className={styles.hoverOverlay}>
-              <button className={styles.overlayBtn}
-                onClick={() => pinnedId === 'local' ? onUnpin?.() : onPin?.('local')}>
-                📌 {pinnedId === 'local' ? 'Unpin' : 'Pin'}
+              <button
+                className={styles.overlayBtn}
+                onClick={() =>
+                  pinnedId === "local" ? onUnpin?.() : onPin?.("local")
+                }
+              >
+                📌 {pinnedId === "local" ? "Unpin" : "Pin"}
               </button>
-              <button className={`${styles.overlayBtn} ${styles.overlayBtnRed}`} onClick={onDismiss}>
+              <button
+                className={`${styles.overlayBtn} ${styles.overlayBtnRed}`}
+                onClick={onDismiss}
+              >
                 ✕ Hide
               </button>
             </div>
@@ -163,12 +225,15 @@ export default function PipWindow({
               userName={p.userName}
               muted={false}
               mirrored={false}
+              videoEnabled={peerHasVideo(p)}
               isPinned={pinnedId === p.socketId}
               hovered={hovered === p.socketId}
               onEnter={() => setHovered(p.socketId)}
               onLeave={() => setHovered(null)}
-              onPin={() => pinnedId === p.socketId ? onUnpin?.() : onPin?.(p.socketId)}
-              pinLabel={pinnedId === p.socketId ? 'Unpin' : 'Pin'}
+              onPin={() =>
+                pinnedId === p.socketId ? onUnpin?.() : onPin?.(p.socketId)
+              }
+              pinLabel={pinnedId === p.socketId ? "Unpin" : "Pin"}
             />
           ))}
         </div>
@@ -179,20 +244,20 @@ export default function PipWindow({
         <div className={styles.mediaBtns}>
           {onToggleAudio && (
             <button
-              className={`${styles.mediaBtn} ${!audioEnabled ? styles.mediaBtnOff : ''}`}
+              className={`${styles.mediaBtn} ${!audioEnabled ? styles.mediaBtnOff : ""}`}
               onClick={onToggleAudio}
-              title={audioEnabled ? 'Mute' : 'Unmute'}
+              title={audioEnabled ? "Mute" : "Unmute"}
             >
-              {audioEnabled ? '🎙️' : '🔇'}
+              {audioEnabled ? "🎙️" : "🔇"}
             </button>
           )}
           {onToggleVideo && (
             <button
-              className={`${styles.mediaBtn} ${!videoEnabled ? styles.mediaBtnOff : ''}`}
+              className={`${styles.mediaBtn} ${!videoEnabled ? styles.mediaBtnOff : ""}`}
               onClick={onToggleVideo}
-              title={videoEnabled ? 'Stop camera' : 'Start camera'}
+              title={videoEnabled ? "Stop camera" : "Start camera"}
             >
-              {videoEnabled ? '📷' : '📵'}
+              {videoEnabled ? "📷" : "📵"}
             </button>
           )}
           {onLeave && (
@@ -205,21 +270,53 @@ export default function PipWindow({
             </button>
           )}
         </div>
-        {!isDocPip && <span className={styles.count}>{peers.length + 1} participants</span>}
+        {!isDocPip && (
+          <span className={styles.count}>{peers.length + 1} participants</span>
+        )}
       </div>
     </div>
   );
 }
 
 /* ─── Tile ────────────────────────────────────────────────────────────────── */
-function Tile({ stream, userName, muted, mirrored, isPinned, hovered, onEnter, onLeave, onPin, pinLabel, big }) {
+function Tile({
+  stream,
+  userName,
+  muted,
+  mirrored,
+  videoEnabled,
+  isPinned,
+  hovered,
+  onEnter,
+  onLeave,
+  onPin,
+  pinLabel,
+  big,
+}) {
+  // Show avatar whenever there's no live video track
+  const showAvatar =
+    !videoEnabled || !stream || stream.getVideoTracks().length === 0;
+
   return (
     <div
-      className={`${styles.tile} ${isPinned ? styles.tilePinned : ''} ${big ? styles.tileBig : styles.tileSmall}`}
+      className={`${styles.tile} ${isPinned ? styles.tilePinned : ""} ${big ? styles.tileBig : styles.tileSmall}`}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
-      <VideoEl stream={stream} muted={muted} mirrored={mirrored} />
+      <VideoEl
+        stream={stream}
+        muted={muted}
+        mirrored={mirrored}
+        videoEnabled={videoEnabled}
+      />
+
+      {/* Avatar overlay when video is off or stream is missing */}
+      {showAvatar && (
+        <div className={styles.tileAvatar}>
+          <span>{userName?.[0]?.toUpperCase() || "?"}</span>
+        </div>
+      )}
+
       <div className={styles.tileLabel}>{userName}</div>
       {isPinned && <div className={styles.pinBadge}>📌</div>}
       {hovered && (
@@ -234,11 +331,18 @@ function Tile({ stream, userName, muted, mirrored, isPinned, hovered, onEnter, o
 }
 
 /* ─── Video element — direct srcObject wiring ─────────────────────────────── */
-function VideoEl({ stream, muted, mirrored }) {
+function VideoEl({ stream, muted, mirrored, videoEnabled }) {
   const ref = useRef(null);
+
   useEffect(() => {
-    if (ref.current) ref.current.srcObject = stream || null;
+    if (!ref.current) return;
+    ref.current.srcObject = stream || null;
+    // Ensure playback resumes when stream is assigned
+    if (stream) {
+      ref.current.play().catch(() => {});
+    }
   }, [stream]);
+
   return (
     <video
       ref={ref}
@@ -246,7 +350,12 @@ function VideoEl({ stream, muted, mirrored }) {
       playsInline
       muted={muted}
       className={styles.video}
-      style={mirrored ? { transform: 'scaleX(-1)' } : undefined}
+      style={{
+        ...(mirrored ? { transform: "scaleX(-1)" } : undefined),
+        // Keep in DOM but hidden so playback resumes instantly when video turns on
+        opacity: videoEnabled === false ? 0 : 1,
+        transition: "opacity 0.2s ease",
+      }}
     />
   );
 }
