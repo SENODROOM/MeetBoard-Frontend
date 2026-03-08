@@ -32,6 +32,7 @@ export default function PipWindow({
   visible,
   localStream,
   peers,
+  messages = [],
   pinnedId,
   localUserName,
   audioEnabled,
@@ -50,16 +51,42 @@ export default function PipWindow({
   const dragOff = useRef({ x: 0, y: 0 });
   const [pos, setPos] = useState({ x: null, y: null });
   const [hovered, setHovered] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState(null);
+  const toastTimerRef = useRef(null);
+  const prevMsgCountRef = useRef(messages.length);
 
   // pinned peer gets main slot; fall back to first remote
   const mainPeer =
     peers.find((p) => p.socketId === pinnedId) || peers[0] || null;
   const stripPeers = peers.filter((p) => p !== mainPeer);
+  const pipActive = isDocPip || visible;
 
   // Reset to default position whenever window opens
   useEffect(() => {
     if (visible) setPos({ x: null, y: null });
   }, [visible]);
+
+  useEffect(() => {
+    if (!pipActive) return;
+    if (messages.length <= prevMsgCountRef.current) return;
+    const latest = messages[messages.length - 1];
+    if (!latest) return;
+    setToastMsg(latest);
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 4000);
+  }, [messages, pipActive]);
+
+  useEffect(() => {
+    prevMsgCountRef.current = messages.length;
+  }, [messages.length]);
+
+  useEffect(
+    () => () => {
+      clearTimeout(toastTimerRef.current);
+    },
+    [],
+  );
 
   // Drag logic
   const onMouseDown = useCallback(
@@ -146,6 +173,13 @@ export default function PipWindow({
 
       {/* Main area */}
       <div className={styles.mainArea}>
+        {toastMsg && (
+          <div className={styles.chatToast}>
+            <span className={styles.chatToastUser}>{toastMsg.userName || "User"}</span>
+            <span className={styles.chatToastText}>{toastMsg.message}</span>
+          </div>
+        )}
+
         {/* Big remote tile */}
         {mainPeer ? (
           <Tile
@@ -269,11 +303,35 @@ export default function PipWindow({
               📞
             </button>
           )}
+          <button
+            className={`${styles.mediaBtn} ${chatOpen ? styles.mediaBtnOn : ""}`}
+            onClick={() => setChatOpen((v) => !v)}
+            title={chatOpen ? "Hide chat" : "Show chat"}
+          >
+            💬
+          </button>
         </div>
         {!isDocPip && (
           <span className={styles.count}>{peers.length + 1} participants</span>
         )}
       </div>
+
+      {chatOpen && (
+        <div className={styles.chatPanel}>
+          {messages.length === 0 ? (
+            <p className={styles.chatEmpty}>No chat messages yet.</p>
+          ) : (
+            <div className={styles.chatList}>
+              {messages.slice(-50).map((m, i) => (
+                <div key={`${m.timestamp || i}-${i}`} className={styles.chatLine}>
+                  <span className={styles.chatUser}>{m.userName || "User"}:</span>{" "}
+                  <span className={styles.chatText}>{m.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -335,11 +393,25 @@ function VideoEl({ stream, muted, mirrored, videoEnabled }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    if (!ref.current) return;
-    ref.current.srcObject = stream || null;
-    // Ensure playback resumes when stream is assigned
+    const video = ref.current;
+    if (!video) return;
+    video.srcObject = stream || null;
     if (stream) {
-      ref.current.play().catch(() => {});
+      const tryPlay = () => video.play().catch(() => {});
+      video.addEventListener("loadedmetadata", tryPlay, { once: true });
+      if (video.readyState >= 1) tryPlay();
+
+      const onTrackAdded = () => {
+        video.srcObject = null;
+        video.srcObject = stream;
+        tryPlay();
+      };
+      stream.addEventListener("addtrack", onTrackAdded);
+
+      return () => {
+        video.removeEventListener("loadedmetadata", tryPlay);
+        stream.removeEventListener("addtrack", onTrackAdded);
+      };
     }
   }, [stream]);
 

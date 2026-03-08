@@ -67,6 +67,8 @@ export default function Room() {
   const [reactionOpen, setReactionOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [unread, setUnread] = useState(0);
+  const [chatOpenUnreadCount, setChatOpenUnreadCount] = useState(0);
+  const [chatScrollTop, setChatScrollTop] = useState(null);
   const [copied, setCopied] = useState(false);
   const [pinnedId, setPinnedId] = useState(null);
   const [kicked, setKicked] = useState(false);
@@ -486,10 +488,13 @@ export default function Room() {
 
   const handleToggleChat = useCallback(() => {
     setChatOpen((prev) => {
-      if (!prev) setUnread(0);
+      if (!prev) {
+        setChatOpenUnreadCount(unread);
+        setUnread(0);
+      }
       return !prev;
     });
-  }, []);
+  }, [unread]);
 
   const handleRaiseHand = useCallback(() => {
     setHandRaised((prev) => {
@@ -986,6 +991,9 @@ export default function Room() {
           messages={messages}
           userId={userId}
           onSend={sendMessage}
+          unreadCount={chatOpenUnreadCount}
+          initialScrollTop={chatScrollTop}
+          onScrollPositionChange={setChatScrollTop}
           onClose={() => setChatOpen(false)}
         />
       )}
@@ -1036,6 +1044,7 @@ export default function Room() {
             isDocPip={true}
             localStream={localStream}
             peers={peers}
+            messages={messages}
             pinnedId={pinnedId}
             localUserName={userName}
             audioEnabled={audioEnabled}
@@ -1055,6 +1064,7 @@ export default function Room() {
           isDocPip={false}
           localStream={localStream}
           peers={peers}
+          messages={messages}
           pinnedId={pinnedId}
           localUserName={userName}
           audioEnabled={audioEnabled}

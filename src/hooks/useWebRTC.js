@@ -84,6 +84,8 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   const screenStreamRef = useRef(null);
   const peersRef = useRef({});
   const peerScreenSendersRef = useRef({});
+  const pendingIceRef = useRef({});
+  const disconnectTimersRef = useRef({});
 
   const [peers, setPeers] = useState([]);
   const [localStream, setLocalStream] = useState(null);
@@ -167,11 +169,16 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
 
   // ── Remove a peer ────────────────────────────────────────────────────────────
   const removePeer = useCallback((sid) => {
+    if (disconnectTimersRef.current[sid]) {
+      clearTimeout(disconnectTimersRef.current[sid]);
+      delete disconnectTimersRef.current[sid];
+    }
     if (peersRef.current[sid]) {
       peersRef.current[sid].close();
       delete peersRef.current[sid];
     }
     delete peerScreenSendersRef.current[sid];
+    delete pendingIceRef.current[sid];
     setPeers((p) => p.filter((x) => x.socketId !== sid));
   }, []);
 
@@ -272,7 +279,23 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       };
 
       pc.onconnectionstatechange = () => {
-        if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
+        if (pc.connectionState === "connected") {
+          if (disconnectTimersRef.current[sid]) {
+            clearTimeout(disconnectTimersRef.current[sid]);
+            delete disconnectTimersRef.current[sid];
+          }
+          return;
+        }
+        if (pc.connectionState === "disconnected") {
+          if (disconnectTimersRef.current[sid]) return;
+          disconnectTimersRef.current[sid] = setTimeout(() => {
+            const current = peersRef.current[sid];
+            if (!current || current.connectionState !== "disconnected") return;
+            removePeer(sid);
+          }, 6000);
+          return;
+        }
+        if (["failed", "closed"].includes(pc.connectionState)) {
           removePeer(sid);
         }
       };
@@ -282,6 +305,21 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     },
     [removePeer],
   );
+
+  // ── Apply queued ICE candidates once a peer connection is ready ────────────
+  const flushPendingIce = useCallback(async (sid) => {
+    const pc = peersRef.current[sid];
+    const queued = pendingIceRef.current[sid];
+    if (!pc || !queued?.length || !pc.remoteDescription) return;
+
+    const candidates = [...queued];
+    pendingIceRef.current[sid] = [];
+    for (const candidate of candidates) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch {}
+    }
+  }, []);
 
   // ── Socket events ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -325,6 +363,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
           await pc.setLocalDescription({ type: "rollback" });
         }
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        await flushPendingIce(from);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         socket.emit("answer", { to: from, from: socket.id, answer });
@@ -338,6 +377,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       if (!pc || pc.signalingState !== "have-local-offer") return;
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        await flushPendingIce(from);
       } catch (e) {
         console.warn("setRemoteDescription error", e);
       }
@@ -345,7 +385,12 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
 
     const handleIce = async ({ from, candidate }) => {
       const pc = peersRef.current[from];
-      if (!pc || !candidate) return;
+      if (!candidate) return;
+      if (!pc || !pc.remoteDescription) {
+        if (!pendingIceRef.current[from]) pendingIceRef.current[from] = [];
+        pendingIceRef.current[from].push(candidate);
+        return;
+      }
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch {}
@@ -479,9 +524,12 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
 
   // ── Cleanup ──────────────────────────────────────────────────────────────────
   const cleanup = useCallback(() => {
+    Object.values(disconnectTimersRef.current).forEach((t) => clearTimeout(t));
+    disconnectTimersRef.current = {};
     Object.values(peersRef.current).forEach((pc) => pc.close());
     peersRef.current = {};
     peerScreenSendersRef.current = {};
+    pendingIceRef.current = {};
     // Close the Web Audio processing context to free resources
     if (localStreamRef.current?._audioCtx) {
       localStreamRef.current._audioCtx.close().catch(() => {});
