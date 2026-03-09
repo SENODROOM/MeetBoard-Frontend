@@ -40,7 +40,11 @@ export default function Room() {
     }
     return id;
   });
-  const isHost = !!localStorage.getItem(`qm_host_${roomId}`);
+  const [isHost, setIsHost] = useState(
+    () => !!localStorage.getItem(`qm_host_${roomId}`),
+  );
+  const isHostRef = useRef(isHost);
+  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
 
   // ── Username gate ────────────────────────────────────────────────────────────
   const [nameConfirmed, setNameConfirmed] = useState(
@@ -142,7 +146,7 @@ export default function Room() {
         const active = sessions.find((s) => s.roomId === roomId && !s.endedAt);
         if (active) sessionIdRef.current = active._id;
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [classroomId, isHost, nameConfirmed]);
 
   const saveSessionData = useCallback(async () => {
@@ -162,7 +166,7 @@ export default function Room() {
           chatLog: chatPayload,
         }),
       },
-    ).catch(() => {});
+    ).catch(() => { });
   }, [classroomId, messages]);
 
   // ── Sounds ───────────────────────────────────────────────────────────────────
@@ -171,7 +175,13 @@ export default function Room() {
   // ── Socket init ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!nameConfirmed) return;
-    const s = io(SOCKET_URL, { transports: ["websocket", "polling"] });
+    const s = io(SOCKET_URL, {
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+    });
     socketRef.current = s;
     setSocket(s);
 
@@ -244,6 +254,14 @@ export default function Room() {
         return n;
       });
     });
+    // Peer came back after a network drop — reset their stale meta state
+    s.on("user-rejoined", ({ socketId }) => {
+      setPeerMeta((m) => {
+        const n = { ...m };
+        delete n[socketId];
+        return n;
+      });
+    });
 
     // Transcription permission
     s.on("transcribe-permission", ({ allowed }) =>
@@ -270,6 +288,34 @@ export default function Room() {
     s.on("wb-drawing-stop", () => {
       clearTimeout(wbActiveTimerRef.current);
       setWbActive(false);
+    });
+
+    // Server confirms this client is (or was restored as) the host
+    s.on("host-status-confirmed", ({ isHost: confirmed }) => {
+      if (confirmed) {
+        setIsHost(true);
+        localStorage.setItem(`qm_host_${roomId}`, "1");
+      }
+    });
+
+    // Socket reconnected after a network drop — re-register in the room to avoid ghosts
+    s.on("connect", () => {
+      // Only rejoin if we were already in the meeting (not the first connect)
+      if (hasJoined.current) {
+        const currentUserName =
+          localStorage.getItem("qm_userName") || "Reconnected User";
+        const currentUserId = localStorage.getItem("qm_userId") || userId;
+        s.emit("rejoin-room", {
+          roomId,
+          userId: currentUserId,
+          userName: currentUserName,
+        });
+      }
+    });
+
+    // When a peer rejoins after a drop, re-negotiate with them
+    s.on("user-rejoined", ({ socketId, userName: rName }) => {
+      playJoin();
     });
 
     return () => {
@@ -395,7 +441,8 @@ export default function Room() {
     await saveSessionData();
     cleanup();
     socketRef.current?.disconnect();
-    localStorage.removeItem(`qm_host_${roomId}`);
+    // NOTE: intentionally do NOT remove qm_host_${roomId} here
+    // so the host is auto-recognized if they rejoin their own meeting.
     navigate(classroomId ? `/classroom/${classroomId}` : "/");
   }, [saveSessionData, cleanup, roomId, classroomId]);
 
@@ -605,27 +652,27 @@ export default function Room() {
     },
     ...(screenSharing && screenStream
       ? [
-          {
-            socketId: "screen-local",
-            userName: userName + "'s screen",
-            stream: screenStream,
-            isLocal: false,
-            isScreen: true,
-          },
-        ]
+        {
+          socketId: "screen-local",
+          userName: userName + "'s screen",
+          stream: screenStream,
+          isLocal: false,
+          isScreen: true,
+        },
+      ]
       : []),
     ...peers.flatMap((p) => [
       { ...p, isLocal: false, isScreen: false },
       ...(p.screenStream
         ? [
-            {
-              socketId: `screen-${p.socketId}`,
-              userName: p.userName + "'s screen",
-              stream: p.screenStream,
-              isLocal: false,
-              isScreen: true,
-            },
-          ]
+          {
+            socketId: `screen-${p.socketId}`,
+            userName: p.userName + "'s screen",
+            stream: p.screenStream,
+            isLocal: false,
+            isScreen: true,
+          },
+        ]
         : []),
     ]),
   ];

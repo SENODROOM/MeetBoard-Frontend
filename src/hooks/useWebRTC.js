@@ -5,7 +5,25 @@ const ICE = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    // Free public TURN — critical for symmetric-NAT / corporate firewall networks
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 // ── Audio enhancement pipeline ───────────────────────────────────────────────
@@ -279,23 +297,46 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       };
 
       pc.onconnectionstatechange = () => {
+        console.log(`[WebRTC] peer ${sid} state: ${pc.connectionState}`);
+
         if (pc.connectionState === "connected") {
+          // Clear any pending disconnect timer
           if (disconnectTimersRef.current[sid]) {
             clearTimeout(disconnectTimersRef.current[sid]);
             delete disconnectTimersRef.current[sid];
           }
           return;
         }
+
         if (pc.connectionState === "disconnected") {
           if (disconnectTimersRef.current[sid]) return;
+          // Step 1: Attempt ICE restart immediately — fixes most transient drops
+          try { pc.restartIce(); } catch (_) { }
+          // Step 2: If still disconnected after 8s, remove the peer
           disconnectTimersRef.current[sid] = setTimeout(() => {
             const current = peersRef.current[sid];
             if (!current || current.connectionState !== "disconnected") return;
+            console.warn(`[WebRTC] peer ${sid} did not recover, removing.`);
             removePeer(sid);
-          }, 6000);
+          }, 8000);
           return;
         }
-        if (["failed", "closed"].includes(pc.connectionState)) {
+
+        if (pc.connectionState === "failed") {
+          // Try ICE restart first on failure before giving up
+          try { pc.restartIce(); } catch (_) { }
+          // If still failed after 5 seconds, close the connection
+          if (!disconnectTimersRef.current[`fail_${sid}`]) {
+            disconnectTimersRef.current[`fail_${sid}`] = setTimeout(() => {
+              delete disconnectTimersRef.current[`fail_${sid}`];
+              const current = peersRef.current[sid];
+              if (current && current.connectionState === "failed") removePeer(sid);
+            }, 5000);
+          }
+          return;
+        }
+
+        if (pc.connectionState === "closed") {
           removePeer(sid);
         }
       };
@@ -317,7 +358,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     for (const candidate of candidates) {
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch {}
+      } catch { }
     }
   }, []);
 
@@ -393,11 +434,40 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       }
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch {}
+      } catch { }
     };
 
     const handleUserLeft = ({ socketId }) => removePeer(socketId);
     const handleKicked = () => window.dispatchEvent(new Event("qm-kicked"));
+
+    // When a peer rejoins after a network drop, they get a new socketId.
+    // Existing peers need to create a fresh connection to that new socketId.
+    const handleUserRejoined = async ({ socketId, userName: rName }) => {
+      // Clean up any stale connection for this peer
+      if (peersRef.current[socketId]) {
+        peersRef.current[socketId].close();
+        delete peersRef.current[socketId];
+      }
+      // Add placeholder so UI shows them immediately
+      setPeers((prev) => {
+        if (prev.find((p) => p.socketId === socketId)) return prev;
+        return [...prev, { socketId, userName: rName, stream: null, screenStream: null }];
+      });
+      // Create new peer connection and send offer
+      const pc = createPeerConnection(socketId, rName);
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit("offer", {
+          to: socketId,
+          from: socket.id,
+          offer,
+          userName,
+        });
+      } catch (e) {
+        console.warn("rejoin offer error", e);
+      }
+    };
 
     const handlePeerScreenStopped = ({ socketId }) => {
       // Null out the screenStream so the UI removes the screen tile.
@@ -412,6 +482,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
 
     socket.on("existing-peers", handleExistingPeers);
     socket.on("user-joined", handleUserJoined);
+    socket.on("user-rejoined", handleUserRejoined);
     socket.on("offer", handleOffer);
     socket.on("answer", handleAnswer);
     socket.on("ice-candidate", handleIce);
@@ -422,6 +493,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     return () => {
       socket.off("existing-peers", handleExistingPeers);
       socket.off("user-joined", handleUserJoined);
+      socket.off("user-rejoined", handleUserRejoined);
       socket.off("offer", handleOffer);
       socket.off("answer", handleAnswer);
       socket.off("ice-candidate", handleIce);
@@ -467,7 +539,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         if (sender && pc) {
           try {
             pc.removeTrack(sender);
-          } catch {}
+          } catch { }
           delete peerScreenSendersRef.current[sid];
           await renegotiate(sid);
         }
@@ -507,7 +579,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
             if (sender && pc) {
               try {
                 pc.removeTrack(sender);
-              } catch {}
+              } catch { }
               delete peerScreenSendersRef.current[sid];
               await renegotiate(sid);
             }
@@ -532,7 +604,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     pendingIceRef.current = {};
     // Close the Web Audio processing context to free resources
     if (localStreamRef.current?._audioCtx) {
-      localStreamRef.current._audioCtx.close().catch(() => {});
+      localStreamRef.current._audioCtx.close().catch(() => { });
     }
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     screenStreamRef.current?.getTracks().forEach((t) => t.stop());
