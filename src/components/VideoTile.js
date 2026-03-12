@@ -101,15 +101,19 @@ export default function VideoTile({
     }
   };
 
-  // FIX: keep overlay visible while pinned so users can see and click Unpin
-  const showOverlay = hover || isPinned;
+  // FIX: use onPointerEnter/Leave instead of onMouseEnter/Leave.
+  // In some browsers, onMouseLeave fires BEFORE onClick when the cursor
+  // moves from the tile to the overlay button, causing the overlay to
+  // disappear and swallowing the click. Pointer events don't have this race.
+  // Only show overlay on hover — the pin badge already indicates pinned state.
+  const showOverlay = hover;
 
   return (
     <div
       className={`${styles.tile} ${isPinned ? styles.pinned : ""} ${isSpeaking ? styles.speaking : ""}`}
       style={isSpeaking ? { "--vol": vol } : {}}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onPointerEnter={() => setHover(true)}
+      onPointerLeave={() => setHover(false)}
     >
       <video
         ref={videoRef}
@@ -147,11 +151,12 @@ export default function VideoTile({
 
       {showOverlay && (
         <div className={styles.overlay}>
-          {/* FIX: stopPropagation prevents the click from bubbling to the tile
-              div, which was triggering onMouseLeave → hover=false → overlay
-              disappears before onPin could register, making pin feel broken. */}
           <button
             className={styles.overlayBtn}
+            // onMouseDown prevents the tile's onPointerLeave from firing
+            // before this button's onClick, which was a secondary race condition
+            // path in certain browser/OS combinations.
+            onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.stopPropagation();
               onPin && onPin();
@@ -164,6 +169,7 @@ export default function VideoTile({
           {showPip && (
             <button
               className={styles.overlayBtn}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={handlePip}
               title="Picture in Picture"
             >
@@ -175,6 +181,7 @@ export default function VideoTile({
           {isHost && onKick && !isScreen && (
             <button
               className={`${styles.overlayBtn} ${styles.kickBtn}`}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 onKick();

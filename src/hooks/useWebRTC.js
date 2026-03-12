@@ -111,6 +111,8 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [screenSharing, setScreenSharing] = useState(false);
+  // FIX: Expose reconnecting state so the UI can show a "reconnecting..." overlay
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   // Stable ref so async callbacks always have the latest socket
   const socketRef = useRef(socket);
@@ -198,6 +200,30 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     delete peerScreenSendersRef.current[sid];
     delete pendingIceRef.current[sid];
     setPeers((p) => p.filter((x) => x.socketId !== sid));
+  }, []);
+
+  // FIX: Clear ALL peer state before re-establishing connections after a rejoin.
+  // Without this, stale peer entries from before the disconnect remain in the
+  // React state and create ghost tiles that never get media.
+  const clearAllPeers = useCallback(() => {
+    // Cancel all pending disconnect timers first
+    Object.entries(disconnectTimersRef.current).forEach(([, t]) =>
+      clearTimeout(t),
+    );
+    disconnectTimersRef.current = {};
+
+    // Close all RTCPeerConnections
+    Object.values(peersRef.current).forEach((pc) => {
+      try {
+        pc.close();
+      } catch {}
+    });
+    peersRef.current = {};
+    peerScreenSendersRef.current = {};
+    pendingIceRef.current = {};
+
+    // Clear React state so the grid rerenders with no ghost tiles
+    setPeers([]);
   }, []);
 
   // ── Create RTCPeerConnection ─────────────────────────────────────────────────
@@ -311,7 +337,9 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         if (pc.connectionState === "disconnected") {
           if (disconnectTimersRef.current[sid]) return;
           // Step 1: Attempt ICE restart immediately — fixes most transient drops
-          try { pc.restartIce(); } catch (_) { }
+          try {
+            pc.restartIce();
+          } catch (_) {}
           // Step 2: If still disconnected after 8s, remove the peer
           disconnectTimersRef.current[sid] = setTimeout(() => {
             const current = peersRef.current[sid];
@@ -324,13 +352,16 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
 
         if (pc.connectionState === "failed") {
           // Try ICE restart first on failure before giving up
-          try { pc.restartIce(); } catch (_) { }
+          try {
+            pc.restartIce();
+          } catch (_) {}
           // If still failed after 5 seconds, close the connection
           if (!disconnectTimersRef.current[`fail_${sid}`]) {
             disconnectTimersRef.current[`fail_${sid}`] = setTimeout(() => {
               delete disconnectTimersRef.current[`fail_${sid}`];
               const current = peersRef.current[sid];
-              if (current && current.connectionState === "failed") removePeer(sid);
+              if (current && current.connectionState === "failed")
+                removePeer(sid);
             }, 5000);
           }
           return;
@@ -358,7 +389,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     for (const candidate of candidates) {
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch { }
+      } catch {}
     }
   }, []);
 
@@ -366,7 +397,27 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   useEffect(() => {
     if (!socket) return;
 
+    // FIX: handleExistingPeers is called both on first join AND on rejoin after
+    // a network drop. On rejoin we must ensure:
+    //   1. All stale peer state is cleared first (done by Room.js calling
+    //      clearAllPeers before emitting rejoin-room on the socket connect event).
+    //   2. localStreamRef.current is valid — if it was null the createPeerConnection
+    //      call won't add any tracks and media won't flow. We re-initialize here
+    //      if necessary.
     const handleExistingPeers = async (existingPeers) => {
+      // Ensure we have a working local stream before dialing out.
+      // On first join initLocalStream() was already called by Room.js.
+      // On rejoin the stream reference may still be valid (tracks are alive),
+      // so we only re-init if the stream is actually gone.
+      if (!localStreamRef.current) {
+        console.warn(
+          "[WebRTC] localStream missing on existing-peers — re-initializing",
+        );
+        await initLocalStream();
+      }
+
+      setIsReconnecting(false);
+
       for (const peer of existingPeers) {
         const pc = createPeerConnection(peer.socketId, peer.userName);
         try {
@@ -434,26 +485,42 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       }
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch { }
+      } catch {}
     };
 
     const handleUserLeft = ({ socketId }) => removePeer(socketId);
     const handleKicked = () => window.dispatchEvent(new Event("qm-kicked"));
 
-    // When a peer rejoins after a network drop, they get a new socketId.
-    // Existing peers need to create a fresh connection to that new socketId.
+    // FIX: When a peer rejoins after a network drop, they have a new socketId.
+    // We must:
+    //   1. Remove ANY stale entry for that socketId (shouldn't exist but be safe).
+    //   2. Add a placeholder immediately so their name appears in the UI.
+    //   3. Create a new RTCPeerConnection and send an offer.
+    // The re-joining peer handles their own side via handleExistingPeers above.
     const handleUserRejoined = async ({ socketId, userName: rName }) => {
-      // Clean up any stale connection for this peer
+      console.log(`[WebRTC] peer rejoined: ${rName} (${socketId})`);
+
+      // Remove stale connection for this socketId if any
       if (peersRef.current[socketId]) {
         peersRef.current[socketId].close();
         delete peersRef.current[socketId];
       }
-      // Add placeholder so UI shows them immediately
+
+      // Show placeholder immediately — stream arrives once tracks flow
       setPeers((prev) => {
         if (prev.find((p) => p.socketId === socketId)) return prev;
-        return [...prev, { socketId, userName: rName, stream: null, screenStream: null }];
+        return [
+          ...prev,
+          { socketId, userName: rName, stream: null, screenStream: null },
+        ];
       });
-      // Create new peer connection and send offer
+
+      // Ensure local stream is alive before creating the outbound connection
+      if (!localStreamRef.current) {
+        await initLocalStream();
+      }
+
+      // Create new peer connection and send offer to the rejoined peer
       const pc = createPeerConnection(socketId, rName);
       try {
         const offer = await pc.createOffer();
@@ -471,8 +538,6 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
 
     const handlePeerScreenStopped = ({ socketId }) => {
       // Null out the screenStream so the UI removes the screen tile.
-      // The streamRole map lives in the pc closure and will naturally reset
-      // when the peer starts a new screen share (new stream ID = new role entry).
       setPeers((prev) =>
         prev.map((p) =>
           p.socketId === socketId ? { ...p, screenStream: null } : p,
@@ -501,7 +566,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       socket.off("kicked", handleKicked);
       socket.off("peer-screen-stopped", handlePeerScreenStopped);
     };
-  }, [socket, createPeerConnection, removePeer, userName]);
+  }, [socket, createPeerConnection, removePeer, initLocalStream, userName]);
 
   // ── Audio toggle ─────────────────────────────────────────────────────────────
   const toggleAudio = useCallback(() => {
@@ -539,7 +604,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         if (sender && pc) {
           try {
             pc.removeTrack(sender);
-          } catch { }
+          } catch {}
           delete peerScreenSendersRef.current[sid];
           await renegotiate(sid);
         }
@@ -579,7 +644,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
             if (sender && pc) {
               try {
                 pc.removeTrack(sender);
-              } catch { }
+              } catch {}
               delete peerScreenSendersRef.current[sid];
               await renegotiate(sid);
             }
@@ -604,10 +669,11 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     pendingIceRef.current = {};
     // Close the Web Audio processing context to free resources
     if (localStreamRef.current?._audioCtx) {
-      localStreamRef.current._audioCtx.close().catch(() => { });
+      localStreamRef.current._audioCtx.close().catch(() => {});
     }
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
     camStreamRef.current = null;
     setPeers([]);
     setLocalStream(null);
@@ -621,10 +687,12 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     audioEnabled,
     videoEnabled,
     screenSharing,
+    isReconnecting,
     initLocalStream,
     toggleAudio,
     toggleVideo,
     toggleScreenShare,
     cleanup,
+    clearAllPeers,
   };
 };

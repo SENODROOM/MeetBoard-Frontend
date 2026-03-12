@@ -19,7 +19,7 @@
   gap: 8px;
   background: rgba(2, 5, 12, 0.98);
   border-bottom: 1px solid rgba(255, 255, 255, 0.055);
-  box-shadow: 0 2px 20px rgba(0, 0, 0, .5);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
 }
 
 .logo {
@@ -30,7 +30,7 @@
   font-weight: 800;
   color: var(--text);
   white-space: nowrap;
-  font-family: var(--font-head, 'Syne', sans-serif);
+  font-family: var(--font-head, "Syne", sans-serif);
 }
 
 .logo strong {
@@ -40,25 +40,25 @@
 .logoIcon {
   font-size: 17px;
   color: var(--accent);
-  filter: drop-shadow(0 0 8px rgba(0, 229, 255, .6));
+  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.6));
 }
 
 .logoIconImage {
   height: 20px;
   width: auto;
-  filter: drop-shadow(0 0 8px rgba(0, 229, 255, .6));
+  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.6));
 }
 
 .classroomPill {
   padding: 2px 8px;
-  background: rgba(157, 113, 255, .12);
-  border: 1px solid rgba(157, 113, 255, .25);
+  background: rgba(157, 113, 255, 0.12);
+  border: 1px solid rgba(157, 113, 255, 0.25);
   color: #b197fc;
   font-size: 9px;
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--font-mono, "Space Mono", monospace);
   border-radius: 4px;
   text-transform: uppercase;
-  letter-spacing: .5px;
+  letter-spacing: 0.5px;
 }
 
 .roomInfo {
@@ -70,53 +70,53 @@
 
 .publicPill {
   padding: 2px 7px;
-  background: rgba(0, 229, 255, .07);
-  border: 1px solid rgba(0, 229, 255, .18);
+  background: rgba(0, 229, 255, 0.07);
+  border: 1px solid rgba(0, 229, 255, 0.18);
   color: var(--accent);
   font-size: 9px;
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--font-mono, "Space Mono", monospace);
   border-radius: 4px;
 }
 
 .privatePill {
   padding: 2px 7px;
-  background: rgba(157, 113, 255, .07);
-  border: 1px solid rgba(157, 113, 255, .18);
+  background: rgba(157, 113, 255, 0.07);
+  border: 1px solid rgba(157, 113, 255, 0.18);
   color: #b197fc;
   font-size: 9px;
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--font-mono, "Space Mono", monospace);
   border-radius: 4px;
 }
 
 .hostPill {
   padding: 2px 7px;
-  background: rgba(255, 190, 60, .09);
-  border: 1px solid rgba(255, 190, 60, .22);
+  background: rgba(255, 190, 60, 0.09);
+  border: 1px solid rgba(255, 190, 60, 0.22);
   color: var(--amber, #ffbe3c);
   font-size: 9px;
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--font-mono, "Space Mono", monospace);
   border-radius: 4px;
 }
 
 .roomId {
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--font-mono, "Space Mono", monospace);
   font-size: 11px;
   color: var(--text-2);
-  background: rgba(255, 255, 255, .04);
+  background: rgba(255, 255, 255, 0.04);
   padding: 3px 8px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .copyBtn {
   padding: 3px 9px;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-3);
   font-size: 10px;
   border-radius: 5px;
   cursor: pointer;
-  transition: all .15s;
+  transition: all 0.15s;
 }
 
 .copyBtn:hover {
@@ -133,8 +133,8 @@
 
 .layoutSwitch {
   display: flex;
-  background: rgba(255, 255, 255, .04);
-  border: 1px solid rgba(255, 255, 255, .07);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 8px;
   padding: 2px;
   gap: 1px;
@@ -149,7 +149,7 @@
   font-size: 11px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all .14s;
+  transition: all 0.14s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -157,13 +157,13 @@
 
 .layoutBtn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, .07);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .layoutBtnActive {
   background: var(--accent) !important;
   color: #000 !important;
-  box-shadow: 0 0 10px rgba(0, 229, 255, .35);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.35);
 }
 
 .recBadge {
@@ -171,11 +171,11 @@
   align-items: center;
   gap: 4px;
   padding: 3px 9px;
-  background: rgba(239, 68, 68, .13);
-  border: 1px solid rgba(239, 68, 68, .35);
+  background: rgba(239, 68, 68, 0.13);
+  border: 1px solid rgba(239, 68, 68, 0.35);
   color: #f87171;
   font-size: 10px;
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--font-mono, "Space Mono", monospace);
   font-weight: 700;
   border-radius: 6px;
 }
@@ -189,14 +189,13 @@
 }
 
 @keyframes recPulse {
-
   0%,
   100% {
-    opacity: 1
+    opacity: 1;
   }
 
   50% {
-    opacity: .3
+    opacity: 0.3;
   }
 }
 
@@ -210,27 +209,26 @@
 }
 
 @keyframes livePulse {
-
   0%,
   100% {
-    box-shadow: 0 0 8px var(--accent3, #0fffa3)
+    box-shadow: 0 0 8px var(--accent3, #0fffa3);
   }
 
   50% {
-    box-shadow: 0 0 18px var(--accent3, #0fffa3)
+    box-shadow: 0 0 18px var(--accent3, #0fffa3);
   }
 }
 
 .participantCount {
   font-size: 11px;
   color: var(--text-2);
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--font-mono, "Space Mono", monospace);
 }
 
 .unpinAllBtn {
   padding: 3px 9px;
-  background: rgba(0, 229, 255, .07);
-  border: 1px solid rgba(0, 229, 255, .2);
+  background: rgba(0, 229, 255, 0.07);
+  border: 1px solid rgba(0, 229, 255, 0.2);
   color: var(--accent);
   font-size: 10px;
   border-radius: 5px;
@@ -239,14 +237,19 @@
 
 .handBadge {
   padding: 2px 8px;
-  background: rgba(255, 190, 60, .1);
-  border: 1px solid rgba(255, 190, 60, .25);
+  background: rgba(255, 190, 60, 0.1);
+  border: 1px solid rgba(255, 190, 60, 0.25);
   color: var(--amber, #ffbe3c);
   font-size: 10px;
   border-radius: 5px;
 }
 
 /* ── Video layouts ── */
+/*
+  FIX: The videoGrid must have min-height:0 to respect the flex parent's size,
+  and align-items:stretch so every grid cell fills its row height fully.
+  Without these, tiles collapse or overflow when there are multiple users.
+*/
 .videoGrid {
   flex: 1;
   display: grid;
@@ -255,6 +258,7 @@
   min-height: 0;
   overflow: hidden;
   align-content: stretch;
+  align-items: stretch; /* FIX: ensure every cell stretches to fill row height */
 }
 
 /* 1 person: full area */
@@ -269,16 +273,26 @@
   grid-template-rows: 1fr;
 }
 
-/* 3 people: 2 on top row, 1 centred below */
+/*
+  3 people:
+  FIX: Use a 2-column, 2-row grid where the 3rd tile spans both columns,
+  centred, at 50% width. We CANNOT use the :last-child selector here because
+  when a screen-share tile is added it becomes the new last child and the rule
+  accidentally forces it to 50% wide instead of full-width.
+  Instead we target the 3rd child specifically with :nth-child(3).
+*/
 .grid3 {
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
 }
-.grid3 > :last-child {
+
+/* FIX: was `:last-child` — broken when there are screen tiles appended later.
+   `:nth-child(3)` is safe: it only applies to exactly the 3rd tile (the lone
+   bottom tile in a 3-person call) without affecting any later tiles. */
+.grid3 > :nth-child(3) {
   grid-column: 1 / -1;
-  max-width: 50%;
   justify-self: center;
-  width: 100%;
+  width: 50%;
 }
 
 /* 4 people: 2×2 */
@@ -311,6 +325,7 @@
 .pinnedMain {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   border-radius: 14px;
   overflow: hidden;
 }
@@ -380,27 +395,27 @@
 }
 
 .handNote {
-  background: rgba(255, 190, 60, .13);
-  border: 1px solid rgba(255, 190, 60, .3);
+  background: rgba(255, 190, 60, 0.13);
+  border: 1px solid rgba(255, 190, 60, 0.3);
   color: var(--amber, #ffbe3c);
   padding: 6px 18px;
   border-radius: 20px;
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
-  animation: handIn .25s cubic-bezier(.34, 1.56, .64, 1);
+  animation: handIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   backdrop-filter: blur(10px);
 }
 
 @keyframes handIn {
   from {
     opacity: 0;
-    transform: scale(.82)
+    transform: scale(0.82);
   }
 
   to {
     opacity: 1;
-    transform: scale(1)
+    transform: scale(1);
   }
 }
 
@@ -416,8 +431,8 @@
 }
 
 .knockItem {
-  background: rgba(4, 10, 20, .97);
-  border: 1px solid rgba(0, 229, 255, .22);
+  background: rgba(4, 10, 20, 0.97);
+  border: 1px solid rgba(0, 229, 255, 0.22);
   border-radius: 13px;
   padding: 10px 13px;
   display: flex;
@@ -426,19 +441,19 @@
   gap: 10px;
   font-size: 13px;
   backdrop-filter: blur(16px);
-  box-shadow: 0 6px 28px rgba(0, 0, 0, .6);
-  animation: knockIn .25s cubic-bezier(.34, 1.56, .64, 1);
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.6);
+  animation: knockIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @keyframes knockIn {
   from {
     opacity: 0;
-    transform: translateX(28px)
+    transform: translateX(28px);
   }
 
   to {
     opacity: 1;
-    transform: none
+    transform: none;
   }
 }
 
@@ -450,34 +465,34 @@
 
 .admitBtn {
   padding: 5px 11px;
-  background: rgba(15, 255, 163, .1);
-  border: 1px solid rgba(15, 255, 163, .28);
+  background: rgba(15, 255, 163, 0.1);
+  border: 1px solid rgba(15, 255, 163, 0.28);
   color: #0fffa3;
   font-size: 12px;
   font-weight: 700;
   border-radius: 7px;
   cursor: pointer;
-  transition: all .14s;
+  transition: all 0.14s;
 }
 
 .admitBtn:hover {
-  background: rgba(15, 255, 163, .22);
+  background: rgba(15, 255, 163, 0.22);
 }
 
 .rejectBtn {
   padding: 5px 11px;
-  background: rgba(255, 74, 94, .09);
-  border: 1px solid rgba(255, 74, 94, .24);
+  background: rgba(255, 74, 94, 0.09);
+  border: 1px solid rgba(255, 74, 94, 0.24);
   color: var(--red, #ff4a5e);
   font-size: 12px;
   font-weight: 700;
   border-radius: 7px;
   cursor: pointer;
-  transition: all .14s;
+  transition: all 0.14s;
 }
 
 .rejectBtn:hover {
-  background: rgba(255, 74, 94, .2);
+  background: rgba(255, 74, 94, 0.2);
 }
 
 .reactionPicker {
@@ -485,27 +500,27 @@
   bottom: 84px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(4, 8, 18, .98);
-  border: 1px solid rgba(255, 255, 255, .09);
+  background: rgba(4, 8, 18, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 18px;
   padding: 9px 11px;
   display: flex;
   gap: 3px;
   z-index: 210;
   backdrop-filter: blur(20px);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, .7);
-  animation: pickerIn .15s cubic-bezier(.34, 1.56, .64, 1);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+  animation: pickerIn 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @keyframes pickerIn {
   from {
     opacity: 0;
-    transform: translateX(-50%) scale(.78)
+    transform: translateX(-50%) scale(0.78);
   }
 
   to {
     opacity: 1;
-    transform: translateX(-50%) scale(1)
+    transform: translateX(-50%) scale(1);
   }
 }
 
@@ -516,7 +531,7 @@
   cursor: pointer;
   border-radius: 8px;
   padding: 5px;
-  transition: transform .12s;
+  transition: transform 0.12s;
 }
 
 .reactionBtn:hover {
@@ -534,18 +549,58 @@
 @keyframes floatEmoji {
   0% {
     opacity: 1;
-    transform: translateY(0) scale(1)
+    transform: translateY(0) scale(1);
   }
 
   15% {
     opacity: 1;
-    transform: translateY(-20px) scale(1.35)
+    transform: translateY(-20px) scale(1.35);
   }
 
   100% {
     opacity: 0;
-    transform: translateY(-110px) scale(.65)
+    transform: translateY(-110px) scale(0.65);
   }
+}
+
+/* ── Reconnect overlay — shown while re-establishing WebRTC after a network drop ── */
+.reconnectOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 5, 12, 0.75);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.reconnectCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  background: rgba(6, 12, 24, 0.97);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 18px;
+  padding: 30px 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+
+.reconnectSpinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(0, 229, 255, 0.12);
+  border-top-color: var(--accent, #00e5ff);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+.reconnectCard p {
+  color: var(--text-2);
+  font-size: 14px;
+  margin: 0;
 }
 
 /* ── Wait screens ── */
@@ -555,12 +610,22 @@
   align-items: center;
   justify-content: center;
   background: var(--bg, #020509);
-  background-image: radial-gradient(ellipse at 30% 20%, rgba(0, 229, 255, .05), transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(157, 113, 255, .05), transparent 60%);
+  background-image:
+    radial-gradient(
+      ellipse at 30% 20%,
+      rgba(0, 229, 255, 0.05),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at 70% 80%,
+      rgba(157, 113, 255, 0.05),
+      transparent 60%
+    );
 }
 
 .waitCard {
-  background: rgba(6, 12, 24, .92);
-  border: 1px solid rgba(255, 255, 255, .09);
+  background: rgba(6, 12, 24, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 22px;
   padding: 44px 38px;
   display: flex;
@@ -570,7 +635,9 @@
   text-align: center;
   max-width: 400px;
   width: 90vw;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .75), inset 0 1px 0 rgba(255, 255, 255, .06);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(24px);
 }
 
@@ -578,7 +645,7 @@
   font-size: 18px;
   font-weight: 800;
   color: var(--accent);
-  font-family: var(--font-head, 'Syne', sans-serif);
+  font-family: var(--font-head, "Syne", sans-serif);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -587,13 +654,13 @@
 .waitLogoImage {
   height: 22px;
   width: auto;
-  filter: drop-shadow(0 0 8px rgba(0, 229, 255, .6));
+  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.6));
 }
 
 .waitCard h2 {
   font-size: 22px;
   font-weight: 800;
-  font-family: var(--font-head, 'Syne', sans-serif);
+  font-family: var(--font-head, "Syne", sans-serif);
 }
 
 .waitCard p {
@@ -605,67 +672,71 @@
 .waitInput {
   width: 100%;
   padding: 12px 14px;
-  background: rgba(255, 255, 255, .06);
-  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--text);
   font-size: 15px;
   border-radius: 11px;
   outline: none;
-  transition: all .18s;
-  font-family: var(--font-ui, 'Outfit', sans-serif);
+  transition: all 0.18s;
+  font-family: var(--font-ui, "Outfit", sans-serif);
 }
 
 .waitInput:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 229, 255, .1);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.1);
 }
 
 .waitError {
   color: #f87171;
   font-size: 12px;
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--font-mono, "Space Mono", monospace);
 }
 
 .waitJoinBtn {
   width: 100%;
   padding: 13px;
-  background: linear-gradient(135deg, var(--accent, #00e5ff), var(--accent-d, #00b8cc));
+  background: linear-gradient(
+    135deg,
+    var(--accent, #00e5ff),
+    var(--accent-d, #00b8cc)
+  );
   color: #000;
   font-weight: 800;
   font-size: 15px;
   border-radius: 12px;
   cursor: pointer;
   border: none;
-  transition: all .18s;
-  font-family: var(--font-ui, 'Outfit', sans-serif);
+  transition: all 0.18s;
+  font-family: var(--font-ui, "Outfit", sans-serif);
 }
 
 .waitJoinBtn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(0, 229, 255, .4);
+  box-shadow: 0 8px 28px rgba(0, 229, 255, 0.4);
 }
 
 .waitSpinner {
   width: 44px;
   height: 44px;
-  border: 3px solid rgba(0, 229, 255, .12);
+  border: 3px solid rgba(0, 229, 255, 0.12);
   border-top-color: var(--accent);
   border-radius: 50%;
-  animation: spin .8s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
   to {
-    transform: rotate(360deg)
+    transform: rotate(360deg);
   }
 }
 
 .waitRoom {
-  font-family: var(--font-mono, 'Space Mono', monospace);
+  font-family: var(--font-mono, "Space Mono", monospace);
   font-size: 12px;
   color: var(--accent);
-  background: rgba(0, 229, 255, .06);
-  border: 1px solid rgba(0, 229, 255, .18);
+  background: rgba(0, 229, 255, 0.06);
+  border: 1px solid rgba(0, 229, 255, 0.18);
   padding: 6px 14px;
   border-radius: 8px;
 }
@@ -673,12 +744,12 @@
 .waitLeave {
   padding: 9px 22px;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, .1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--text-2);
   font-size: 14px;
   border-radius: 9px;
   cursor: pointer;
-  transition: all .16s;
+  transition: all 0.16s;
 }
 
 .waitLeave:hover {
@@ -688,7 +759,6 @@
 
 /* ── Mobile & Tablet Responsiveness ── */
 @media (max-width: 992px) {
-
   /* Sidebars / Spotlight Strip should consume less space */
   .pinnedSidebar {
     width: 140px;
@@ -704,7 +774,6 @@
 }
 
 @media (max-width: 768px) {
-
   /* Wait Screen Adjustments */
   .waitCard {
     padding: 30px 24px;
@@ -779,7 +848,6 @@
 }
 
 @media (max-width: 480px) {
-
   /* Smaller Topbar */
   .topRight {
     width: 100%;

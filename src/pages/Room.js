@@ -44,7 +44,9 @@ export default function Room() {
     () => !!localStorage.getItem(`qm_host_${roomId}`),
   );
   const isHostRef = useRef(isHost);
-  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
+  useEffect(() => {
+    isHostRef.current = isHost;
+  }, [isHost]);
 
   // ── Username gate ────────────────────────────────────────────────────────────
   const [nameConfirmed, setNameConfirmed] = useState(
@@ -97,15 +99,21 @@ export default function Room() {
   const [wbAllowed, setWbAllowed] = useState(true);
 
   // ── Whiteboard active drawing indicator ──────────────────────────────────────
-  // True when a remote peer is currently drawing on the whiteboard
   const [wbActive, setWbActive] = useState(false);
   const wbActiveTimerRef = useRef(null);
 
   // ── Private room ─────────────────────────────────────────────────────────────
   const [roomInfo, setRoomInfo] = useState(null);
   const [knockStatus, setKnockStatus] = useState(null);
+  // Keep ref in sync so socket handlers always see the latest value
+  useEffect(() => {
+    knockStatusRef.current = knockStatus;
+  }, [knockStatus]);
   const [knockRequests, setKnockRequests] = useState([]);
   const hasJoined = useRef(false);
+  // Ref so the socket "connect" handler can read latest knockStatus without
+  // needing to re-register (which would require nameConfirmed dep re-run).
+  const knockStatusRef = useRef(null);
 
   // ── PiP ──────────────────────────────────────────────────────────────────────
   const [pipVisible, setPipVisible] = useState(false);
@@ -146,7 +154,7 @@ export default function Room() {
         const active = sessions.find((s) => s.roomId === roomId && !s.endedAt);
         if (active) sessionIdRef.current = active._id;
       })
-      .catch(() => { });
+      .catch(() => {});
   }, [classroomId, isHost, nameConfirmed]);
 
   const saveSessionData = useCallback(async () => {
@@ -166,7 +174,7 @@ export default function Room() {
           chatLog: chatPayload,
         }),
       },
-    ).catch(() => { });
+    ).catch(() => {});
   }, [classroomId, messages]);
 
   // ── Sounds ───────────────────────────────────────────────────────────────────
@@ -193,8 +201,16 @@ export default function Room() {
       });
       playMessage();
     });
-    s.on("knock-request", ({ socketId, userName: kName }) => {
-      setKnockRequests((p) => [...p, { socketId, userName: kName }]);
+    s.on("knock-request", ({ socketId, userName: kName, userId: kUserId }) => {
+      setKnockRequests((prev) => {
+        // FIX: Replace any existing request from the same userId (re-knock after
+        // leave/reconnect) rather than appending a duplicate. This ensures the
+        // Admit button uses the fresh socket ID and actually reaches the guest.
+        const filtered = prev.filter(
+          (k) => k.userId !== kUserId && k.socketId !== socketId,
+        );
+        return [...filtered, { socketId, userName: kName, userId: kUserId }];
+      });
       playKnock();
     });
     s.on("knock-accepted", () => {
@@ -254,8 +270,16 @@ export default function Room() {
         return n;
       });
     });
-    // Peer came back after a network drop — reset their stale meta state
+
+    // FIX: Consolidated single user-rejoined handler.
+    // Previous code had two listeners: one in this socket init block (which only
+    // called playJoin) and one inside useWebRTC. Having two listeners on the same
+    // event is fine (Socket.IO supports it), but the Room.js one was redundant
+    // and its playJoin() call was firing even when useWebRTC hadn't finished
+    // setting up the connection. Now we handle everything here: reset stale meta
+    // and play the join sound.
     s.on("user-rejoined", ({ socketId }) => {
+      playJoin();
       setPeerMeta((m) => {
         const n = { ...m };
         delete n[socketId];
@@ -277,14 +301,11 @@ export default function Room() {
     });
 
     // ── Whiteboard drawing indicator ─────────────────────────────────────────
-    // A peer started drawing — light up the whiteboard button green
     s.on("wb-drawing-start", () => {
       setWbActive(true);
       clearTimeout(wbActiveTimerRef.current);
-      // Safety auto-clear in case wb-drawing-stop is missed
       wbActiveTimerRef.current = setTimeout(() => setWbActive(false), 3000);
     });
-    // Peer stopped drawing — turn the indicator off
     s.on("wb-drawing-stop", () => {
       clearTimeout(wbActiveTimerRef.current);
       setWbActive(false);
@@ -298,10 +319,30 @@ export default function Room() {
       }
     });
 
-    // Socket reconnected after a network drop — re-register in the room to avoid ghosts
+    // ── FIX: Network reconnect — the Google Meet-like auto-rejoin ─────────────
+    // When Socket.IO auto-reconnects after a network drop, the socket gets a
+    // new socket.id. We must re-register with the server AND rebuild all WebRTC
+    // connections from scratch.
+    //
+    // Flow:
+    //   1. Network drops → socket disconnects
+    //   2. Socket.IO auto-reconnects (new socket.id)
+    //   3. "connect" fires here → we call clearAllPeers() then emit rejoin-room
+    //   4. Server broadcasts "user-rejoined" to other peers
+    //   5. Server sends "existing-peers" back to us
+    //   6. useWebRTC.handleExistingPeers creates fresh RTCPeerConnections
+    //   7. useWebRTC.handleUserRejoined on other clients creates connections back
+    //
+    // We use a ref (clearAllPeersRef) so the "connect" handler always has access
+    // to the latest clearAllPeers function from useWebRTC without the effect
+    // needing to re-run and re-register the handler every render.
     s.on("connect", () => {
-      // Only rejoin if we were already in the meeting (not the first connect)
       if (hasJoined.current) {
+        console.log("[Room] socket reconnected — rejoining room");
+        // Step 1: Wipe stale peer state so the grid has no ghost tiles
+        clearAllPeersRef.current?.();
+        // Step 2: Tell server we're back — it will broadcast user-rejoined and
+        //         send us existing-peers so we can rebuild connections
         const currentUserName =
           localStorage.getItem("qm_userName") || "Reconnected User";
         const currentUserId = localStorage.getItem("qm_userId") || userId;
@@ -310,12 +351,19 @@ export default function Room() {
           userId: currentUserId,
           userName: currentUserName,
         });
+      } else if (knockStatusRef.current === "knocking") {
+        // User was waiting to be admitted when the socket dropped.
+        // Re-emit knock so the server registers their new socket.id and
+        // the host receives an updated knock-request they can actually admit.
+        console.log("[Room] socket reconnected while knocking — re-knocking");
+        const currentUserName = localStorage.getItem("qm_userName") || userName;
+        const currentUserId = localStorage.getItem("qm_userId") || userId;
+        s.emit("knock", {
+          roomId,
+          userId: currentUserId,
+          userName: currentUserName,
+        });
       }
-    });
-
-    // When a peer rejoins after a drop, re-negotiate with them
-    s.on("user-rejoined", ({ socketId, userName: rName }) => {
-      playJoin();
     });
 
     return () => {
@@ -341,12 +389,21 @@ export default function Room() {
     audioEnabled,
     videoEnabled,
     screenSharing,
+    isReconnecting,
     initLocalStream,
     toggleAudio,
     toggleVideo,
     toggleScreenShare,
     cleanup,
+    clearAllPeers,
   } = useWebRTC({ socket, roomId, userId, userName });
+
+  // ── Stable ref to clearAllPeers so the "connect" socket handler (registered
+  //    once in the socket init effect) can always call the latest version ──────
+  const clearAllPeersRef = useRef(clearAllPeers);
+  useEffect(() => {
+    clearAllPeersRef.current = clearAllPeers;
+  }, [clearAllPeers]);
 
   // ── Meeting recorder (admin only) ─────────────────────────────────────────
   const { recording, duration, startRecording, stopRecording } =
@@ -405,7 +462,9 @@ export default function Room() {
     if (
       pinnedId &&
       pinnedId !== "local" &&
-      !peers.some((p) => p.socketId === pinnedId)
+      !peers.some((p) => p.socketId === pinnedId) &&
+      pinnedId !== "screen-local" &&
+      !peers.some((p) => `screen-${p.socketId}` === pinnedId)
     )
       setPinnedId(null);
   }, [peers, pinnedId]);
@@ -441,8 +500,6 @@ export default function Room() {
     await saveSessionData();
     cleanup();
     socketRef.current?.disconnect();
-    // NOTE: intentionally do NOT remove qm_host_${roomId} here
-    // so the host is auto-recognized if they rejoin their own meeting.
     navigate(classroomId ? `/classroom/${classroomId}` : "/");
   }, [saveSessionData, cleanup, roomId, classroomId]);
 
@@ -652,27 +709,27 @@ export default function Room() {
     },
     ...(screenSharing && screenStream
       ? [
-        {
-          socketId: "screen-local",
-          userName: userName + "'s screen",
-          stream: screenStream,
-          isLocal: false,
-          isScreen: true,
-        },
-      ]
+          {
+            socketId: "screen-local",
+            userName: userName + "'s screen",
+            stream: screenStream,
+            isLocal: false,
+            isScreen: true,
+          },
+        ]
       : []),
     ...peers.flatMap((p) => [
       { ...p, isLocal: false, isScreen: false },
       ...(p.screenStream
         ? [
-          {
-            socketId: `screen-${p.socketId}`,
-            userName: p.userName + "'s screen",
-            stream: p.screenStream,
-            isLocal: false,
-            isScreen: true,
-          },
-        ]
+            {
+              socketId: `screen-${p.socketId}`,
+              userName: p.userName + "'s screen",
+              stream: p.screenStream,
+              isLocal: false,
+              isScreen: true,
+            },
+          ]
         : []),
     ]),
   ];
@@ -718,6 +775,16 @@ export default function Room() {
           {r.emoji}
         </div>
       ))}
+
+      {/* ── FIX: Reconnect overlay — shown while re-establishing after network drop ── */}
+      {isReconnecting && (
+        <div className={styles.reconnectOverlay}>
+          <div className={styles.reconnectCard}>
+            <div className={styles.reconnectSpinner} />
+            <p>Reconnecting to meeting…</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Topbar ── */}
       <div className={styles.topbar}>
