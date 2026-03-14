@@ -16,6 +16,8 @@ const THEMES = {
 
 export default function ClassroomDashboard() {
   const navigate = useNavigate();
+  // FIX: get user identity and authFetch from AuthContext — no more
+  // localStorage.getItem('qm_userId') or manual Authorization headers
   const { user, authFetch, logout } = useAuth();
 
   const [classrooms, setClassrooms] = useState([]);
@@ -32,6 +34,7 @@ export default function ClassroomDashboard() {
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // FIX: fetch from /mine — uses token userId, no URL param needed
   const fetchClassrooms = useCallback(async () => {
     setLoading(true);
     try {
@@ -57,6 +60,7 @@ export default function ClassroomDashboard() {
     setSubmitting(true);
     setFormError("");
     try {
+      // FIX: no creatorId/creatorName in body — server reads from JWT token
       const r = await authFetch(`${API}/api/classrooms`, {
         method: "POST",
         body: JSON.stringify({
@@ -96,6 +100,7 @@ export default function ClassroomDashboard() {
     setSubmitting(true);
     setFormError("");
     try {
+      // FIX: no userId/userName in body — server reads from JWT token
       const r = await authFetch(`${API}/api/classrooms/join`, {
         method: "POST",
         body: JSON.stringify({ inviteCode: inviteCode.trim() }),
@@ -119,6 +124,7 @@ export default function ClassroomDashboard() {
     logout();
     navigate("/login");
   };
+
   const currentName = user?.name || "";
 
   return (
@@ -161,8 +167,8 @@ export default function ClassroomDashboard() {
                 : "Your Classrooms"}
             </h1>
             <p>
-              {!loading &&
-                `${classrooms.length} classroom${classrooms.length !== 1 ? "s" : ""} · `}
+              {classrooms.length} classroom{classrooms.length !== 1 ? "s" : ""}{" "}
+              ·{" "}
               {new Date().toLocaleDateString("en-US", {
                 weekday: "long",
                 month: "long",
@@ -192,26 +198,10 @@ export default function ClassroomDashboard() {
           </div>
         </div>
 
-        {/* Feature 10: Skeleton screens replace spinner while loading */}
         {loading && (
-          <div className={styles.grid}>
-            {Array(6)
-              .fill(0)
-              .map((_, i) => (
-                <div key={i} className={styles.skeletonCard} aria-hidden="true">
-                  <div className={styles.skeletonBanner} />
-                  <div className={styles.skeletonBody}>
-                    <div
-                      className={styles.skeletonLine}
-                      style={{ width: "60%" }}
-                    />
-                    <div
-                      className={styles.skeletonLine}
-                      style={{ width: "40%" }}
-                    />
-                  </div>
-                </div>
-              ))}
+          <div className={styles.loading}>
+            <div className={styles.spinner} />
+            <span>Loading classrooms…</span>
           </div>
         )}
 
@@ -250,10 +240,10 @@ export default function ClassroomDashboard() {
           <div className={styles.grid}>
             {classrooms.map((c) => {
               const th = THEMES[c.theme || "cyan"];
+              // FIX: compare against user.id from token, not localStorage
               const isOwner = c.creatorId === user?.id;
-              const students = (c.members || []).filter(
-                (m) => m.role === "student",
-              );
+              const members = c.members || [];
+              const students = members.filter((m) => m.role === "student");
               return (
                 <div
                   key={c.classroomId}
@@ -317,21 +307,12 @@ export default function ClassroomDashboard() {
       {/* Create Modal */}
       {modal === "create" && (
         <div className={styles.modalOverlay} onClick={() => setModal(null)}>
-          <div
-            className={styles.modal}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-title"
-          >
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <span className={styles.modalTitle} id="modal-title">
-                Create Classroom
-              </span>
+              <span className={styles.modalTitle}>Create Classroom</span>
               <button
                 className={styles.modalClose}
                 onClick={() => setModal(null)}
-                aria-label="Close dialog"
               >
                 ✕
               </button>
@@ -432,21 +413,12 @@ export default function ClassroomDashboard() {
       {/* Join Modal */}
       {modal === "join" && (
         <div className={styles.modalOverlay} onClick={() => setModal(null)}>
-          <div
-            className={styles.modal}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-title"
-          >
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <span className={styles.modalTitle} id="modal-title">
-                Join Classroom
-              </span>
+              <span className={styles.modalTitle}>Join Classroom</span>
               <button
                 className={styles.modalClose}
                 onClick={() => setModal(null)}
-                aria-label="Close dialog"
               >
                 ✕
               </button>

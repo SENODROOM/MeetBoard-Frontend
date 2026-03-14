@@ -12,30 +12,26 @@ export default function VideoTile({
   onPin,
   isHost,
   onKick,
+  quality = null, // 'good' | 'fair' | 'poor' | null — Feature 9
 }) {
   const videoRef = useRef(null);
-  const [hover, setHover] = useState(false);
-  const [vol, setVol] = useState(0);
   const analyserRef = useRef(null);
   const rafRef = useRef(null);
+  const [hover, setHover] = useState(false);
+  const [vol, setVol] = useState(0);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-
     video.srcObject = stream || null;
-
     if (stream) {
       const tryPlay = () => {
         video.play().catch(() => {});
       };
       video.addEventListener("loadedmetadata", tryPlay, { once: true });
       if (video.readyState >= 1) tryPlay();
-
-      if (!isLocal && "autoPictureInPicture" in video) {
+      if (!isLocal && "autoPictureInPicture" in video)
         video.autoPictureInPicture = true;
-      }
-
       const onTrackAdded = () => {
         video.srcObject = null;
         video.srcObject = stream;
@@ -81,8 +77,6 @@ export default function VideoTile({
   const initials = (userName || "?").slice(0, 2).toUpperCase();
   const hueShift =
     [...(userName || "")].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
-
-  // PiP: show for all screen tiles and all remote camera tiles
   const showPip = document.pictureInPictureEnabled && (!isLocal || isScreen);
 
   const handlePip = async (e) => {
@@ -91,22 +85,20 @@ export default function VideoTile({
     if (!video) return;
     try {
       if (video.paused) await video.play();
-      if (document.pictureInPictureElement === video) {
+      if (document.pictureInPictureElement === video)
         await document.exitPictureInPicture();
-      } else {
-        await video.requestPictureInPicture();
-      }
+      else await video.requestPictureInPicture();
     } catch (err) {
       console.error("PiP error", err);
     }
   };
 
-  // FIX: use onPointerEnter/Leave instead of onMouseEnter/Leave.
-  // In some browsers, onMouseLeave fires BEFORE onClick when the cursor
-  // moves from the tile to the overlay button, causing the overlay to
-  // disappear and swallowing the click. Pointer events don't have this race.
-  // Only show overlay on hover — the pin badge already indicates pinned state.
-  const showOverlay = hover;
+  // Quality indicator config
+  const qualityConfig = {
+    good: { color: "#34d399", bars: 3, label: "Good connection" },
+    fair: { color: "#fbbf24", bars: 2, label: "Fair connection" },
+    poor: { color: "#f87171", bars: 1, label: "Poor connection" },
+  };
 
   return (
     <div
@@ -149,13 +141,33 @@ export default function VideoTile({
 
       {isPinned && <div className={styles.pinBadge}>📌</div>}
 
-      {showOverlay && (
+      {/* Feature 9: Connection quality signal bars — remote non-screen peers only */}
+      {quality && !isLocal && !isScreen && qualityConfig[quality] && (
+        <div
+          className={styles.qualityIndicator}
+          title={qualityConfig[quality].label}
+          aria-label={qualityConfig[quality].label}
+        >
+          {[1, 2, 3].map((bar) => (
+            <div
+              key={bar}
+              className={styles.qualityBar}
+              style={{
+                height: bar * 4 + 2,
+                background:
+                  bar <= qualityConfig[quality].bars
+                    ? qualityConfig[quality].color
+                    : "rgba(255,255,255,0.15)",
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {hover && (
         <div className={styles.overlay}>
           <button
             className={styles.overlayBtn}
-            // onMouseDown prevents the tile's onPointerLeave from firing
-            // before this button's onClick, which was a secondary race condition
-            // path in certain browser/OS combinations.
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.stopPropagation();
@@ -177,7 +189,6 @@ export default function VideoTile({
             </button>
           )}
 
-          {/* Never show kick on screen tiles — they are not real participants */}
           {isHost && onKick && !isScreen && (
             <button
               className={`${styles.overlayBtn} ${styles.kickBtn}`}

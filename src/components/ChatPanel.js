@@ -32,10 +32,10 @@ export default function ChatPanel({
     lastScrollTopRef.current = el.scrollTop;
   };
 
+  // Scroll on open
   useEffect(() => {
     const el = messagesRef.current;
     if (!el || initializedRef.current) return;
-
     if (unreadCount > 0 && firstUnreadRef.current) {
       firstUnreadRef.current.scrollIntoView({ block: "start" });
     } else if (typeof initialScrollTop === "number") {
@@ -43,12 +43,12 @@ export default function ChatPanel({
     } else {
       el.scrollTop = el.scrollHeight;
     }
-
     syncBottomState();
     lastMessageCountRef.current = messages.length;
     initializedRef.current = true;
   }, [messages.length, unreadCount, initialScrollTop]);
 
+  // Auto-scroll to new messages if already at bottom
   useEffect(() => {
     if (!initializedRef.current) return;
     const hadNewMessages = messages.length > lastMessageCountRef.current;
@@ -59,12 +59,18 @@ export default function ChatPanel({
     syncBottomState();
   }, [messages]);
 
+  // Save scroll position on unmount
   useEffect(
     () => () => {
       onScrollPositionChange?.(lastScrollTopRef.current);
     },
     [onScrollPositionChange],
   );
+
+  // Focus textarea when panel opens (a11y: move focus into dialog)
+  useEffect(() => {
+    textRef.current?.focus();
+  }, []);
 
   const send = () => {
     if (!input.trim()) return;
@@ -73,7 +79,7 @@ export default function ChatPanel({
     textRef.current?.focus();
   };
 
-  // Group consecutive msgs from same user
+  // Group consecutive messages from same user
   const groups = [];
   messages.forEach((msg, i) => {
     const prev = messages[i - 1];
@@ -89,17 +95,26 @@ export default function ChatPanel({
   });
 
   return (
-    <div className={styles.panel}>
+    <div
+      className={styles.panel}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Chat"
+    >
       <div className={styles.header}>
         <span className={styles.title}>💬 Chat</span>
-        <button className={styles.closeBtn} onClick={onClose}>
+        <button
+          className={styles.closeBtn}
+          onClick={onClose}
+          aria-label="Close chat"
+        >
           ✕
         </button>
       </div>
 
       {messages.length === 0 ? (
         <div className={styles.emptyChat}>
-          <span>💬</span>
+          <span aria-hidden="true">💬</span>
           <p>
             No messages yet.
             <br />
@@ -111,6 +126,8 @@ export default function ChatPanel({
           className={styles.messages}
           ref={messagesRef}
           onScroll={syncBottomState}
+          aria-live="polite"
+          aria-relevant="additions"
         >
           {groups.map((g, gi) => {
             const isOwn = g.userId === userId;
@@ -119,21 +136,32 @@ export default function ChatPanel({
                 key={gi}
                 className={`${styles.msgGroup} ${isOwn ? styles.msgOwn : styles.msgOther}`}
               >
-                {!isOwn && <div className={styles.msgAuthor}>{g.userName}</div>}
+                {!isOwn && (
+                  <div className={styles.msgAuthor} aria-hidden="true">
+                    {g.userName}
+                  </div>
+                )}
                 {g.msgs.map((msg, mi) => (
                   <React.Fragment key={`${msg._index}-${mi}`}>
                     {msg._index === unreadStartIndex && unreadCount > 0 && (
                       <div
                         className={styles.unreadDivider}
                         ref={firstUnreadRef}
+                        role="separator"
+                        aria-label="Unread messages below"
                       >
                         Unread messages
                       </div>
                     )}
-                    <div className={styles.msgBubble}>{msg.message}</div>
+                    <div
+                      className={styles.msgBubble}
+                      aria-label={`${isOwn ? "You" : g.userName}: ${msg.message}`}
+                    >
+                      {msg.message}
+                    </div>
                   </React.Fragment>
                 ))}
-                <div className={styles.msgTime}>
+                <div className={styles.msgTime} aria-hidden="true">
                   {new Date(
                     g.msgs[g.msgs.length - 1].timestamp,
                   ).toLocaleTimeString([], {
@@ -155,6 +183,7 @@ export default function ChatPanel({
           placeholder="Message…"
           value={input}
           rows={1}
+          aria-label="Message input"
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -167,6 +196,7 @@ export default function ChatPanel({
           className={styles.sendBtn}
           onClick={send}
           disabled={!input.trim()}
+          aria-label="Send message"
         >
           ➤
         </button>

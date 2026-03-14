@@ -28,7 +28,7 @@ export default function Room() {
   const location = useLocation();
   const classroomId = new URLSearchParams(location.search).get("classroom");
 
-  // ── Identity — ALL declared first, nothing above these ──────────────────────
+  // ── Identity ─────────────────────────────────────────────────────────────────
   const [userName, setUserName] = useState(
     () => localStorage.getItem("qm_userName") || "",
   );
@@ -82,49 +82,66 @@ export default function Room() {
   const [layout, setLayout] = useState("grid");
   const [reactions, setReactions] = useState([]);
 
-  // ── New feature panels ───────────────────────────────────────────────────────
+  // ── Feature panels ───────────────────────────────────────────────────────────
   const [transcribeOpen, setTranscribeOpen] = useState(false);
   const [breakoutOpen, setBreakoutOpen] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
   const [qnaOpen, setQnaOpen] = useState(false);
 
-  // ── Permissions (host grants to participants) ─────────────────────────────
+  // ── Permissions ───────────────────────────────────────────────────────────────
   const [transcribePermitted, setTranscribePermitted] = useState(false);
   const [pollBadge, setPollBadge] = useState(0);
   const [qnaBadge, setQnaBadge] = useState(0);
 
-  // ── Peer meta ────────────────────────────────────────────────────────────────
+  // ── Peer meta ─────────────────────────────────────────────────────────────────
   const [peerMeta, setPeerMeta] = useState({});
   const [wbPermissions, setWbPermissions] = useState({});
   const [wbAllowed, setWbAllowed] = useState(true);
-
-  // ── Whiteboard active drawing indicator ──────────────────────────────────────
   const [wbActive, setWbActive] = useState(false);
   const wbActiveTimerRef = useRef(null);
 
-  // ── Private room ─────────────────────────────────────────────────────────────
+  // ── Private room ──────────────────────────────────────────────────────────────
   const [roomInfo, setRoomInfo] = useState(null);
   const [knockStatus, setKnockStatus] = useState(null);
-  // Keep ref in sync so socket handlers always see the latest value
+  const [knockRequests, setKnockRequests] = useState([]);
+  const hasJoined = useRef(false);
+  const knockStatusRef = useRef(null);
   useEffect(() => {
     knockStatusRef.current = knockStatus;
   }, [knockStatus]);
-  const [knockRequests, setKnockRequests] = useState([]);
-  const hasJoined = useRef(false);
-  // Ref so the socket "connect" handler can read latest knockStatus without
-  // needing to re-register (which would require nameConfirmed dep re-run).
-  const knockStatusRef = useRef(null);
 
-  // ── PiP ──────────────────────────────────────────────────────────────────────
+  // ── PiP ───────────────────────────────────────────────────────────────────────
   const [pipVisible, setPipVisible] = useState(false);
   const [docPipWindow, setDocPipWindow] = useState(null);
   const pipDismissedRef = useRef(false);
 
-  // ── Classroom session tracking ───────────────────────────────────────────────
+  // ── Classroom session ─────────────────────────────────────────────────────────
   const sessionIdRef = useRef(null);
 
-  // ── All useEffects AFTER all state declarations ──────────────────────────────
+  // ── Feature 8: Reconnection failure ──────────────────────────────────────────
+  const [connectionFailed, setConnectionFailed] = useState(false);
 
+  // ── Refs for panel open state (prevent stale badge increments) ────────────────
+  const pollOpenRef = useRef(pollOpen);
+  useEffect(() => {
+    pollOpenRef.current = pollOpen;
+  }, [pollOpen]);
+  const qnaOpenRef = useRef(qnaOpen);
+  useEffect(() => {
+    qnaOpenRef.current = qnaOpen;
+  }, [qnaOpen]);
+
+  // ── Refs for audio/video state (force controls run once, not on every toggle) ─
+  const audioEnabledRef = useRef(true);
+  const videoEnabledRef = useRef(true);
+
+  // ── Ref for unread count (prevents stale closure in handleToggleChat) ─────────
+  const unreadRef = useRef(0);
+  useEffect(() => {
+    unreadRef.current = unread;
+  }, [unread]);
+
+  // ── Visibility → PiP ─────────────────────────────────────────────────────────
   useEffect(() => {
     const onVis = () => {
       if (document.hidden) {
@@ -144,7 +161,7 @@ export default function Room() {
     return () => window.removeEventListener("qm-kicked", onKicked);
   }, []);
 
-  // Classroom session lookup
+  // ── Classroom session lookup ──────────────────────────────────────────────────
   useEffect(() => {
     if (!classroomId || !isHost || !nameConfirmed) return;
     fetch(`${API}/api/classrooms/${classroomId}/sessions`)
@@ -177,10 +194,10 @@ export default function Room() {
     ).catch(() => {});
   }, [classroomId, messages]);
 
-  // ── Sounds ───────────────────────────────────────────────────────────────────
+  // ── Sounds ────────────────────────────────────────────────────────────────────
   const { playJoin, playLeave, playMessage, playKnock } = useSounds();
 
-  // ── Socket init ──────────────────────────────────────────────────────────────
+  // ── Socket init ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!nameConfirmed) return;
     const s = io(SOCKET_URL, {
@@ -201,11 +218,16 @@ export default function Room() {
       });
       playMessage();
     });
+
+    // Feature 6: receive chat history on join/rejoin
+    s.on("chat-history", (history) => {
+      if (Array.isArray(history) && history.length > 0) {
+        setMessages(history);
+      }
+    });
+
     s.on("knock-request", ({ socketId, userName: kName, userId: kUserId }) => {
       setKnockRequests((prev) => {
-        // FIX: Replace any existing request from the same userId (re-knock after
-        // leave/reconnect) rather than appending a duplicate. This ensures the
-        // Admit button uses the fresh socket ID and actually reaches the guest.
         const filtered = prev.filter(
           (k) => k.userId !== kUserId && k.socketId !== socketId,
         );
@@ -222,7 +244,6 @@ export default function Room() {
       playKnock();
     });
 
-    // Host controls
     s.on("force-mute", () => window.dispatchEvent(new Event("qm-force-mute")));
     s.on("force-unmute", () =>
       window.dispatchEvent(new Event("qm-force-unmute")),
@@ -233,10 +254,8 @@ export default function Room() {
     s.on("wb-permission", ({ allowed }) => setWbAllowed(allowed));
     s.on("lower-hand", () => setHandRaised(false));
 
-    // Reactions from peers
     s.on("peer-reaction", ({ emoji, x, y }) => spawnReaction(emoji, x, y));
 
-    // Peer state
     s.on("peer-audio-toggle", ({ socketId, enabled }) =>
       setPeerMeta((m) => ({
         ...m,
@@ -270,14 +289,6 @@ export default function Room() {
         return n;
       });
     });
-
-    // FIX: Consolidated single user-rejoined handler.
-    // Previous code had two listeners: one in this socket init block (which only
-    // called playJoin) and one inside useWebRTC. Having two listeners on the same
-    // event is fine (Socket.IO supports it), but the Room.js one was redundant
-    // and its playJoin() call was firing even when useWebRTC hadn't finished
-    // setting up the connection. Now we handle everything here: reset stale meta
-    // and play the join sound.
     s.on("user-rejoined", ({ socketId }) => {
       playJoin();
       setPeerMeta((m) => {
@@ -287,20 +298,18 @@ export default function Room() {
       });
     });
 
-    // Transcription permission
     s.on("transcribe-permission", ({ allowed }) =>
       setTranscribePermitted(allowed),
     );
 
-    // Poll/QnA badges when panels are closed
+    // Badge only increments when panel is closed
     s.on("poll-new", () => {
-      setPollBadge((b) => b + 1);
+      if (!pollOpenRef.current) setPollBadge((b) => b + 1);
     });
     s.on("qna-new", () => {
-      setQnaBadge((b) => b + 1);
+      if (!qnaOpenRef.current) setQnaBadge((b) => b + 1);
     });
 
-    // ── Whiteboard drawing indicator ─────────────────────────────────────────
     s.on("wb-drawing-start", () => {
       setWbActive(true);
       clearTimeout(wbActiveTimerRef.current);
@@ -311,7 +320,6 @@ export default function Room() {
       setWbActive(false);
     });
 
-    // Server confirms this client is (or was restored as) the host
     s.on("host-status-confirmed", ({ isHost: confirmed }) => {
       if (confirmed) {
         setIsHost(true);
@@ -319,30 +327,13 @@ export default function Room() {
       }
     });
 
-    // ── FIX: Network reconnect — the Google Meet-like auto-rejoin ─────────────
-    // When Socket.IO auto-reconnects after a network drop, the socket gets a
-    // new socket.id. We must re-register with the server AND rebuild all WebRTC
-    // connections from scratch.
-    //
-    // Flow:
-    //   1. Network drops → socket disconnects
-    //   2. Socket.IO auto-reconnects (new socket.id)
-    //   3. "connect" fires here → we call clearAllPeers() then emit rejoin-room
-    //   4. Server broadcasts "user-rejoined" to other peers
-    //   5. Server sends "existing-peers" back to us
-    //   6. useWebRTC.handleExistingPeers creates fresh RTCPeerConnections
-    //   7. useWebRTC.handleUserRejoined on other clients creates connections back
-    //
-    // We use a ref (clearAllPeersRef) so the "connect" handler always has access
-    // to the latest clearAllPeers function from useWebRTC without the effect
-    // needing to re-run and re-register the handler every render.
+    // Feature 8: reconnection failure
+    s.on("reconnect_failed", () => setConnectionFailed(true));
+
     s.on("connect", () => {
       if (hasJoined.current) {
         console.log("[Room] socket reconnected — rejoining room");
-        // Step 1: Wipe stale peer state so the grid has no ghost tiles
         clearAllPeersRef.current?.();
-        // Step 2: Tell server we're back — it will broadcast user-rejoined and
-        //         send us existing-peers so we can rebuild connections
         const currentUserName =
           localStorage.getItem("qm_userName") || "Reconnected User";
         const currentUserId = localStorage.getItem("qm_userId") || userId;
@@ -352,9 +343,6 @@ export default function Room() {
           userName: currentUserName,
         });
       } else if (knockStatusRef.current === "knocking") {
-        // User was waiting to be admitted when the socket dropped.
-        // Re-emit knock so the server registers their new socket.id and
-        // the host receives an updated knock-request they can actually admit.
         console.log("[Room] socket reconnected while knocking — re-knocking");
         const currentUserName = localStorage.getItem("qm_userName") || userName;
         const currentUserId = localStorage.getItem("qm_userId") || userId;
@@ -386,6 +374,7 @@ export default function Room() {
     localStream,
     screenStream,
     peers,
+    peerQuality, // Feature 9
     audioEnabled,
     videoEnabled,
     screenSharing,
@@ -398,14 +387,20 @@ export default function Room() {
     clearAllPeers,
   } = useWebRTC({ socket, roomId, userId, userName });
 
-  // ── Stable ref to clearAllPeers so the "connect" socket handler (registered
-  //    once in the socket init effect) can always call the latest version ──────
+  // Keep audioEnabled/videoEnabled refs in sync for force-mute handler
+  useEffect(() => {
+    audioEnabledRef.current = audioEnabled;
+  }, [audioEnabled]);
+  useEffect(() => {
+    videoEnabledRef.current = videoEnabled;
+  }, [videoEnabled]);
+
   const clearAllPeersRef = useRef(clearAllPeers);
   useEffect(() => {
     clearAllPeersRef.current = clearAllPeers;
   }, [clearAllPeers]);
 
-  // ── Meeting recorder (admin only) ─────────────────────────────────────────
+  // ── Meeting recorder ──────────────────────────────────────────────────────────
   const { recording, duration, startRecording, stopRecording } =
     useMeetingRecorder({ localStream, peers });
   const handleRecord = useCallback(() => {
@@ -413,16 +408,16 @@ export default function Room() {
     else startRecording();
   }, [recording, startRecording, stopRecording]);
 
-  // ── Host force controls ───────────────────────────────────────────────────────
+  // ── Force controls (run once — reads state from refs) ─────────────────────────
   useEffect(() => {
     const onFM = () => {
-      if (audioEnabled) toggleAudio();
+      if (audioEnabledRef.current) toggleAudio();
     };
     const onFU = () => {
-      if (!audioEnabled) toggleAudio();
+      if (!audioEnabledRef.current) toggleAudio();
     };
     const onFSV = () => {
-      if (videoEnabled) toggleVideo();
+      if (videoEnabledRef.current) toggleVideo();
     };
     window.addEventListener("qm-force-mute", onFM);
     window.addEventListener("qm-force-unmute", onFU);
@@ -432,7 +427,7 @@ export default function Room() {
       window.removeEventListener("qm-force-unmute", onFU);
       window.removeEventListener("qm-force-stop-video", onFSV);
     };
-  }, [audioEnabled, videoEnabled, toggleAudio, toggleVideo]);
+  }, [toggleAudio, toggleVideo]);
 
   // ── Join ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -469,7 +464,7 @@ export default function Room() {
       setPinnedId(null);
   }, [peers, pinnedId]);
 
-  // ── Reactions helper ─────────────────────────────────────────────────────────
+  // ── Reactions ─────────────────────────────────────────────────────────────────
   const spawnReaction = useCallback((emoji, x, y) => {
     const id = crypto.randomUUID();
     setReactions((r) => [
@@ -501,7 +496,7 @@ export default function Room() {
     cleanup();
     socketRef.current?.disconnect();
     navigate(classroomId ? `/classroom/${classroomId}` : "/");
-  }, [saveSessionData, cleanup, roomId, classroomId]);
+  }, [saveSessionData, cleanup, navigate, classroomId]);
 
   const handlePin = useCallback(
     (sid) => setPinnedId((p) => (p === sid ? null : sid)),
@@ -512,6 +507,7 @@ export default function Room() {
       socketRef.current?.emit("kick-user", { roomId, targetSocketId: sid }),
     [roomId],
   );
+
   const admitUser = (sid) => {
     socketRef.current?.emit("admit-user", { roomId, socketId: sid });
     setKnockRequests((p) => p.filter((k) => k.socketId !== sid));
@@ -520,6 +516,7 @@ export default function Room() {
     socketRef.current?.emit("reject-user", { roomId, socketId: sid });
     setKnockRequests((p) => p.filter((k) => k.socketId !== sid));
   };
+
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
@@ -539,66 +536,57 @@ export default function Room() {
       docPipWindow.close();
       return;
     }
-
     if (!("documentPictureInPicture" in window)) {
-      alert(
-        "Document Picture-in-Picture API is not supported in your browser.",
+      console.warn(
+        "Document Picture-in-Picture API is not supported in this browser.",
       );
       return;
     }
-
     try {
       const pipWin = await window.documentPictureInPicture.requestWindow({
         width: 400,
         height: 500,
       });
-
-      // Copy styles
-      [...document.styleSheets].forEach((styleSheet) => {
+      [...document.styleSheets].forEach((ss) => {
         try {
-          const cssRules = [...styleSheet.cssRules]
-            .map((rule) => rule.cssText)
-            .join("");
+          const cssRules = [...ss.cssRules].map((r) => r.cssText).join("");
           const style = document.createElement("style");
           style.textContent = cssRules;
           pipWin.document.head.appendChild(style);
-        } catch (e) {
+        } catch {
           const link = document.createElement("link");
           link.rel = "stylesheet";
-          link.type = styleSheet.type;
-          link.media = styleSheet.media;
-          link.href = styleSheet.href;
+          link.type = ss.type;
+          link.media = ss.media;
+          link.href = ss.href;
           pipWin.document.head.appendChild(link);
         }
       });
-
-      pipWin.document.body.style.margin = "0";
-      pipWin.document.body.style.padding = "0";
-      pipWin.document.body.style.backgroundColor = "#1e1e1e";
-      pipWin.document.body.style.color = "#ffffff";
-      pipWin.document.body.style.fontFamily =
-        "system-ui, -apple-system, sans-serif";
-      pipWin.document.body.style.overflow = "hidden";
-
-      pipWin.addEventListener("pagehide", () => {
-        setDocPipWindow(null);
+      Object.assign(pipWin.document.body.style, {
+        margin: "0",
+        padding: "0",
+        backgroundColor: "#1e1e1e",
+        color: "#ffffff",
+        fontFamily: "system-ui, sans-serif",
+        overflow: "hidden",
       });
-
+      pipWin.addEventListener("pagehide", () => setDocPipWindow(null));
       setDocPipWindow(pipWin);
     } catch (err) {
       console.error("Failed to open Document PiP:", err);
     }
   };
 
+  // handleToggleChat reads unread from ref to avoid stale closure
   const handleToggleChat = useCallback(() => {
     setChatOpen((prev) => {
       if (!prev) {
-        setChatOpenUnreadCount(unread);
+        setChatOpenUnreadCount(unreadRef.current);
         setUnread(0);
       }
       return !prev;
     });
-  }, [unread]);
+  }, []);
 
   const handleRaiseHand = useCallback(() => {
     setHandRaised((prev) => {
@@ -609,12 +597,13 @@ export default function Room() {
     });
   }, [roomId, userName]);
 
-  // ── Enriched peers ────────────────────────────────────────────────────────────
+  // ── Enriched peers — includes quality from useWebRTC ─────────────────────────
   const enrichedPeers = peers.map((p) => ({
     ...p,
     audioMuted: peerMeta[p.socketId]?.audioMuted || false,
     videoStopped: peerMeta[p.socketId]?.videoStopped || false,
     handRaised: peerMeta[p.socketId]?.handRaised || false,
+    quality: peerQuality[p.socketId] || null, // Feature 9
   }));
 
   // ── Wait screens ──────────────────────────────────────────────────────────────
@@ -740,28 +729,51 @@ export default function Room() {
     ? allParticipants.filter((p) => p.socketId !== pinnedId)
     : allParticipants;
   const n = allParticipants.length;
-  const gridClass = (() => {
-    if (n === 1) return styles.grid1;
-    if (n === 2) return styles.grid2;
-    if (n === 3) return styles.grid3;
-    if (n === 4) return styles.grid4;
-    if (n <= 6) return styles.grid6;
-    return styles.gridMany;
-  })();
+  const gridClass =
+    n === 1
+      ? styles.grid1
+      : n === 2
+        ? styles.grid2
+        : n === 3
+          ? styles.grid3
+          : n === 4
+            ? styles.grid4
+            : n <= 6
+              ? styles.grid6
+              : styles.gridMany;
   const raisedHands = enrichedPeers.filter((p) => p.handRaised);
 
   const tileAudio = (p) => {
     if (p.isLocal) return audioEnabled;
     if (p.isScreen) return true;
-    const meta = peerMeta[p.socketId];
-    return meta ? !meta.audioMuted : true;
+    return peerMeta[p.socketId] ? !peerMeta[p.socketId].audioMuted : true;
   };
   const tileVideo = (p) => {
     if (p.isLocal) return videoEnabled;
     if (p.isScreen) return true;
-    const meta = peerMeta[p.socketId];
-    return meta ? !meta.videoStopped : true;
+    return peerMeta[p.socketId] ? !peerMeta[p.socketId].videoStopped : true;
   };
+  // Feature 9: helper to get quality for a tile (only remote non-screen tiles)
+  const tileQuality = (p) =>
+    p.isLocal || p.isScreen ? null : peerQuality[p.socketId] || null;
+
+  const VideoTileEl = (p, extraProps = {}) => (
+    <VideoTile
+      key={p.socketId}
+      stream={p.stream}
+      userName={p.userName}
+      isLocal={p.isLocal}
+      isScreen={p.isScreen || false}
+      audioEnabled={tileAudio(p)}
+      videoEnabled={tileVideo(p)}
+      isPinned={pinnedId === p.socketId}
+      onPin={() => handlePin(p.socketId)}
+      isHost={isHost}
+      onKick={p.isLocal ? null : () => handleKickUser(p.socketId)}
+      quality={tileQuality(p)}
+      {...extraProps}
+    />
+  );
 
   return (
     <div className={styles.room}>
@@ -776,8 +788,60 @@ export default function Room() {
         </div>
       ))}
 
-      {/* ── FIX: Reconnect overlay — shown while re-establishing after network drop ── */}
-      {isReconnecting && (
+      {/* Feature 8: Connection lost overlay */}
+      {connectionFailed && (
+        <div className={styles.reconnectOverlay}>
+          <div className={styles.reconnectCard}>
+            <span style={{ fontSize: 44 }}>📡</span>
+            <p style={{ fontWeight: 700, fontSize: 16, margin: 0 }}>
+              Connection lost
+            </p>
+            <p
+              style={{
+                color: "var(--text-2)",
+                fontSize: 13,
+                margin: "4px 0 0",
+              }}
+            >
+              Could not reconnect to the meeting.
+            </p>
+            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  padding: "10px 22px",
+                  background: "rgba(0,229,255,0.12)",
+                  border: "1px solid rgba(0,229,255,0.3)",
+                  color: "#00e5ff",
+                  borderRadius: 9,
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: 13,
+                }}
+              >
+                🔄 Try Again
+              </button>
+              <button
+                onClick={() => navigate("/")}
+                style={{
+                  padding: "10px 22px",
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "#94a3b8",
+                  borderRadius: 9,
+                  cursor: "pointer",
+                  fontSize: 13,
+                }}
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reconnecting overlay */}
+      {isReconnecting && !connectionFailed && (
         <div className={styles.reconnectOverlay}>
           <div className={styles.reconnectCard}>
             <div className={styles.reconnectSpinner} />
@@ -808,19 +872,22 @@ export default function Room() {
             roomInfo && <span className={styles.privatePill}>🔒 Private</span>
           )}
           <span className={styles.roomId}>{roomId}</span>
-          <button className={styles.copyBtn} onClick={handleCopyLink}>
+          <button
+            className={styles.copyBtn}
+            onClick={handleCopyLink}
+            aria-label={copied ? "Room link copied" : "Copy room link"}
+          >
             {copied ? "✓ Copied" : "⎘ Copy"}
           </button>
           {isHost && <span className={styles.hostPill}>👑 Host</span>}
         </div>
         <div className={styles.topRight}>
-          {/* Layout switcher */}
           <div className={styles.layoutSwitch}>
             {[
-              ["grid", "⊞"],
-              ["spotlight", "◉"],
-              ["sidebar", "⊡"],
-            ].map(([l, icon]) => (
+              ["grid", "⊞", "Grid layout"],
+              ["spotlight", "◉", "Spotlight layout"],
+              ["sidebar", "⊡", "Sidebar layout"],
+            ].map(([l, icon, label]) => (
               <button
                 key={l}
                 className={`${styles.layoutBtn} ${layout === l ? styles.layoutBtnActive : ""}`}
@@ -828,7 +895,9 @@ export default function Room() {
                   setLayout(l);
                   setPinnedId(null);
                 }}
-                title={l}
+                title={label}
+                aria-label={label}
+                aria-pressed={layout === l}
               >
                 {icon}
               </button>
@@ -847,6 +916,7 @@ export default function Room() {
             <button
               className={styles.unpinAllBtn}
               onClick={() => setPinnedId(null)}
+              aria-label="Unpin pinned participant"
             >
               📌 Unpin
             </button>
@@ -855,7 +925,7 @@ export default function Room() {
         </div>
       </div>
 
-      {/* ── Raised hand toasts ── */}
+      {/* Raised hand toasts */}
       {raisedHands.length > 0 && (
         <div className={styles.handNotifications}>
           {raisedHands.map((p) => (
@@ -866,7 +936,7 @@ export default function Room() {
         </div>
       )}
 
-      {/* ── Knock requests (host) ── */}
+      {/* Knock requests (host) */}
       {isHost && knockRequests.length > 0 && (
         <div className={styles.knockPanel}>
           {knockRequests.map((k) => (
@@ -899,20 +969,10 @@ export default function Room() {
           <div className={styles.spotlightMain}>
             {(() => {
               const sp = pinnedP || allParticipants[0];
-              return (
-                <VideoTile
-                  stream={sp.stream}
-                  userName={sp.userName}
-                  isLocal={sp.isLocal}
-                  isScreen={sp.isScreen || false}
-                  audioEnabled={tileAudio(sp)}
-                  videoEnabled={tileVideo(sp)}
-                  isPinned={!!pinnedP}
-                  onPin={() => handlePin(sp.socketId)}
-                  isHost={isHost}
-                  onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)}
-                />
-              );
+              return VideoTileEl(sp, {
+                isPinned: !!pinnedP,
+                onPin: () => handlePin(sp.socketId),
+              });
             })()}
           </div>
           <div className={styles.spotlightStrip}>
@@ -921,18 +981,7 @@ export default function Room() {
               .filter((p) => p.socketId !== pinnedP?.socketId)
               .map((p) => (
                 <div key={p.socketId} className={styles.stripTile}>
-                  <VideoTile
-                    stream={p.stream}
-                    userName={p.userName}
-                    isLocal={p.isLocal}
-                    isScreen={p.isScreen || false}
-                    audioEnabled={tileAudio(p)}
-                    videoEnabled={tileVideo(p)}
-                    isPinned={pinnedId === p.socketId}
-                    onPin={() => handlePin(p.socketId)}
-                    isHost={isHost}
-                    onKick={p.isLocal ? null : () => handleKickUser(p.socketId)}
-                  />
+                  {VideoTileEl(p)}
                 </div>
               ))}
           </div>
@@ -942,20 +991,10 @@ export default function Room() {
           <div className={styles.pinnedMain}>
             {(() => {
               const sp = pinnedP || allParticipants[0];
-              return (
-                <VideoTile
-                  stream={sp.stream}
-                  userName={sp.userName}
-                  isLocal={sp.isLocal}
-                  isScreen={sp.isScreen || false}
-                  audioEnabled={tileAudio(sp)}
-                  videoEnabled={tileVideo(sp)}
-                  isPinned={!!pinnedP}
-                  onPin={() => handlePin(sp.socketId)}
-                  isHost={isHost}
-                  onKick={sp.isLocal ? null : () => handleKickUser(sp.socketId)}
-                />
-              );
+              return VideoTileEl(sp, {
+                isPinned: !!pinnedP,
+                onPin: () => handlePin(sp.socketId),
+              });
             })()}
           </div>
           <div className={styles.pinnedSidebar}>
@@ -965,82 +1004,27 @@ export default function Room() {
                   p.socketId !==
                   (pinnedP?.socketId || allParticipants[0]?.socketId),
               )
-              .map((p) => (
-                <VideoTile
-                  key={p.socketId}
-                  stream={p.stream}
-                  userName={p.userName}
-                  isLocal={p.isLocal}
-                  isScreen={p.isScreen || false}
-                  audioEnabled={tileAudio(p)}
-                  videoEnabled={tileVideo(p)}
-                  isPinned={pinnedId === p.socketId}
-                  onPin={() => handlePin(p.socketId)}
-                  isHost={isHost}
-                  onKick={p.isLocal ? null : () => handleKickUser(p.socketId)}
-                />
-              ))}
+              .map((p) => VideoTileEl(p))}
           </div>
         </div>
       ) : pinnedP ? (
         <div className={styles.pinnedLayout}>
           <div className={styles.pinnedMain}>
-            <VideoTile
-              stream={pinnedP.stream}
-              userName={pinnedP.userName}
-              isLocal={pinnedP.isLocal}
-              isScreen={pinnedP.isScreen || false}
-              audioEnabled={tileAudio(pinnedP)}
-              videoEnabled={tileVideo(pinnedP)}
-              isPinned
-              onPin={() => handlePin(pinnedP.socketId)}
-              isHost={isHost}
-              onKick={
-                pinnedP.isLocal ? null : () => handleKickUser(pinnedP.socketId)
-              }
-            />
+            {VideoTileEl(pinnedP, { isPinned: true })}
           </div>
           {others.length > 0 && (
             <div className={styles.pinnedSidebar}>
-              {others.map((p) => (
-                <VideoTile
-                  key={p.socketId}
-                  stream={p.stream}
-                  userName={p.userName}
-                  isLocal={p.isLocal}
-                  isScreen={p.isScreen || false}
-                  audioEnabled={tileAudio(p)}
-                  videoEnabled={tileVideo(p)}
-                  isPinned={false}
-                  onPin={() => handlePin(p.socketId)}
-                  isHost={isHost}
-                  onKick={p.isLocal ? null : () => handleKickUser(p.socketId)}
-                />
-              ))}
+              {others.map((p) => VideoTileEl(p, { isPinned: false }))}
             </div>
           )}
         </div>
       ) : (
         <div className={`${styles.videoGrid} ${gridClass}`}>
-          {allParticipants.map((p) => (
-            <VideoTile
-              key={p.socketId}
-              stream={p.stream}
-              userName={p.userName}
-              isLocal={p.isLocal}
-              isScreen={p.isScreen || false}
-              audioEnabled={tileAudio(p)}
-              videoEnabled={tileVideo(p)}
-              isPinned={pinnedId === p.socketId}
-              onPin={() => handlePin(p.socketId)}
-              isHost={isHost}
-              onKick={p.isLocal ? null : () => handleKickUser(p.socketId)}
-            />
-          ))}
+          {allParticipants.map((p) => VideoTileEl(p))}
         </div>
       )}
 
-      {/* ── Controls bar ── */}
+      {/* Controls */}
       <Controls
         audioEnabled={audioEnabled}
         videoEnabled={videoEnabled}
@@ -1082,7 +1066,7 @@ export default function Room() {
         onToggleDocPip={handleToggleDocPip}
       />
 
-      {/* ── Emoji reaction picker ── */}
+      {/* Emoji reaction picker */}
       {reactionOpen && (
         <div className={styles.reactionPicker}>
           {["👍", "❤️", "😂", "😮", "👏", "🔥", "🎉", "😢", "💯", "🤔"].map(
@@ -1099,7 +1083,6 @@ export default function Room() {
         </div>
       )}
 
-      {/* ── Chat panel ── */}
       {chatOpen && (
         <ChatPanel
           messages={messages}
@@ -1112,7 +1095,6 @@ export default function Room() {
         />
       )}
 
-      {/* ── Whiteboard ── */}
       {whiteboardOpen && socket && (
         <Whiteboard
           socket={socket}
@@ -1123,8 +1105,6 @@ export default function Room() {
           onClose={() => setWhiteboardOpen(false)}
         />
       )}
-
-      {/* ── Floating video strip (whiteboard overlay) ── */}
       {whiteboardOpen && (
         <FloatingVideos
           localStream={localStream}
@@ -1135,7 +1115,6 @@ export default function Room() {
         />
       )}
 
-      {/* ── Settings panel ── */}
       {settingsOpen && (
         <SettingsPanel
           peers={enrichedPeers}
@@ -1150,7 +1129,6 @@ export default function Room() {
         />
       )}
 
-      {/* ── PiP overlay (in-tab or Document PiP) ── */}
       {docPipWindow ? (
         <DocumentPipPortal pipWindow={docPipWindow}>
           <PipWindow
@@ -1196,7 +1174,6 @@ export default function Room() {
         />
       )}
 
-      {/* ── Transcribe panel ── */}
       {transcribeOpen && (
         <TranscribePanel
           isHost={isHost}
@@ -1208,8 +1185,6 @@ export default function Room() {
           onClose={() => setTranscribeOpen(false)}
         />
       )}
-
-      {/* ── Breakout panel ── */}
       {breakoutOpen && (
         <BreakoutPanel
           isHost={isHost}
@@ -1221,8 +1196,6 @@ export default function Room() {
           onClose={() => setBreakoutOpen(false)}
         />
       )}
-
-      {/* ── Poll panel ── */}
       {pollOpen && (
         <PollPanel
           isHost={isHost}
@@ -1232,8 +1205,6 @@ export default function Room() {
           onClose={() => setPollOpen(false)}
         />
       )}
-
-      {/* ── Q&A panel ── */}
       {qnaOpen && (
         <QnAPanel
           isHost={isHost}

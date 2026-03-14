@@ -1,42 +1,87 @@
-import React, { useState } from 'react';
-import styles from './SettingsPanel.module.css';
+import React, { useState } from "react";
+import styles from "./SettingsPanel.module.css";
 
-export default function SettingsPanel({ peers, socket, roomId, isHost, onClose, wbPermissions, onWbPermChange }) {
-  const [tab, setTab] = useState('participants'); // participants | room | advanced
-
+export default function SettingsPanel({
+  peers,
+  socket,
+  roomId,
+  isHost,
+  onClose,
+  wbPermissions,
+  onWbPermChange,
+}) {
+  const [tab, setTab] = useState("participants");
   const emit = (ev, data) => socket?.emit(ev, { roomId, ...data });
 
   return (
-    <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={styles.panel}>
-        {/* Header */}
+    <div
+      className={styles.overlay}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className={styles.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+      >
         <div className={styles.header}>
-          <span className={styles.title}>⚙️ Settings</span>
-          <button className={styles.closeBtn} onClick={onClose}>✕</button>
+          <span className={styles.title} id="settings-title">
+            ⚙️ Settings
+          </span>
+          <button
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="Close settings"
+          >
+            ✕
+          </button>
         </div>
 
-        {/* Tabs */}
-        <div className={styles.tabs}>
-          {['participants','room','advanced'].map(t => (
-            <button key={t} className={`${styles.tab} ${tab===t ? styles.tabActive:''}`}
-              onClick={() => setTab(t)}>
-              {t === 'participants' ? '👥 Participants' : t === 'room' ? '🏠 Room' : '⚡ Advanced'}
+        <div
+          className={styles.tabs}
+          role="tablist"
+          aria-label="Settings sections"
+        >
+          {["participants", "room", "advanced"].map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={tab === t}
+              className={`${styles.tab} ${tab === t ? styles.tabActive : ""}`}
+              onClick={() => setTab(t)}
+            >
+              {t === "participants"
+                ? "👥 Participants"
+                : t === "room"
+                  ? "🏠 Room"
+                  : "⚡ Advanced"}
             </button>
           ))}
         </div>
 
         <div className={styles.body}>
-          {/* ── Participants tab ── */}
-          {tab === 'participants' && (
-            <div className={styles.section}>
+          {tab === "participants" && (
+            <div
+              className={styles.section}
+              role="tabpanel"
+              aria-label="Participants"
+            >
               {isHost && (
                 <div className={styles.hostActions}>
                   <span className={styles.sectionLabel}>Host actions</span>
                   <div className={styles.bulkBtns}>
-                    <button className={styles.bulkBtn} onClick={() => emit('host-mute-all')}>
+                    <button
+                      className={styles.bulkBtn}
+                      onClick={() => emit("host-mute-all")}
+                      aria-label="Mute all participants"
+                    >
                       🔇 Mute everyone
                     </button>
-                    <button className={styles.bulkBtn} onClick={() => emit('host-lower-all-hands')}>
+                    <button
+                      className={styles.bulkBtn}
+                      onClick={() => emit("host-lower-all-hands")}
+                      aria-label="Lower all raised hands"
+                    >
                       ✋ Lower all hands
                     </button>
                   </div>
@@ -50,43 +95,81 @@ export default function SettingsPanel({ peers, socket, roomId, isHost, onClose, 
               {peers.map((p) => (
                 <div key={p.socketId} className={styles.peerRow}>
                   <div className={styles.peerInfo}>
-                    <div className={styles.peerAvatar}>{p.userName?.[0]?.toUpperCase() || '?'}</div>
+                    <div className={styles.peerAvatar} aria-hidden="true">
+                      {p.userName?.[0]?.toUpperCase() || "?"}
+                    </div>
                     <div className={styles.peerMeta}>
                       <span className={styles.peerName}>{p.userName}</span>
                       <span className={styles.peerStatus}>
-                        {p.handRaised ? '✋ Hand raised · ' : ''}
-                        {p.audioMuted ? '🔇 Muted' : '🎙️ Live'} · {p.videoStopped ? '📵 No video' : '📷 Video on'}
+                        {p.handRaised ? "✋ Hand raised · " : ""}
+                        {p.audioMuted ? "🔇 Muted" : "🎙️ Live"} ·{" "}
+                        {p.videoStopped ? "📵 No video" : "📷 Video on"}
                       </span>
                     </div>
                   </div>
                   {isHost && (
                     <div className={styles.peerControls}>
-                      <button className={styles.iconBtn} title="Mute"
-                        onClick={() => emit('host-mute-user', { targetSocketId: p.socketId })}>
+                      <button
+                        className={styles.iconBtn}
+                        title="Mute participant"
+                        aria-label={`Mute ${p.userName}`}
+                        onClick={() =>
+                          emit("host-mute-user", { targetSocketId: p.socketId })
+                        }
+                      >
                         🔇
                       </button>
-                      <button className={styles.iconBtn} title="Stop video"
-                        onClick={() => emit('host-stop-video', { targetSocketId: p.socketId })}>
+                      <button
+                        className={styles.iconBtn}
+                        title="Stop video"
+                        aria-label={`Stop ${p.userName}'s video`}
+                        onClick={() =>
+                          emit("host-stop-video", {
+                            targetSocketId: p.socketId,
+                          })
+                        }
+                      >
                         📵
                       </button>
                       <button
                         className={`${styles.wbBtn} ${wbPermissions[p.socketId] === false ? styles.wbOff : styles.wbOn}`}
                         title="Toggle whiteboard access"
+                        aria-label={`${wbPermissions[p.socketId] === false ? "Grant" : "Revoke"} whiteboard access for ${p.userName}`}
+                        aria-pressed={wbPermissions[p.socketId] !== false}
                         onClick={() => {
                           const allowed = wbPermissions[p.socketId] !== false;
                           onWbPermChange(p.socketId, !allowed);
-                          emit('host-wb-permission', { targetSocketId: p.socketId, allowed: !allowed });
-                        }}>
-                        {wbPermissions[p.socketId] === false ? '⬜ WB off' : '⬜ WB on'}
+                          emit("host-wb-permission", {
+                            targetSocketId: p.socketId,
+                            allowed: !allowed,
+                          });
+                        }}
+                      >
+                        {wbPermissions[p.socketId] === false
+                          ? "⬜ WB off"
+                          : "⬜ WB on"}
                       </button>
                       <button
                         className={styles.wbBtn}
-                        title="Grant/revoke transcription access"
-                        onClick={() => emit('host-grant-transcribe', { targetSocketId: p.socketId, allowed: true })}>
+                        title="Grant transcription access"
+                        aria-label={`Grant transcription to ${p.userName}`}
+                        onClick={() =>
+                          emit("host-grant-transcribe", {
+                            targetSocketId: p.socketId,
+                            allowed: true,
+                          })
+                        }
+                      >
                         🎙 Transcribe
                       </button>
-                      <button className={`${styles.iconBtn} ${styles.kickBtn}`} title="Remove"
-                        onClick={() => emit('kick-user', { targetSocketId: p.socketId })}>
+                      <button
+                        className={`${styles.iconBtn} ${styles.kickBtn}`}
+                        title="Remove participant"
+                        aria-label={`Remove ${p.userName} from meeting`}
+                        onClick={() =>
+                          emit("kick-user", { targetSocketId: p.socketId })
+                        }
+                      >
                         🚫
                       </button>
                     </div>
@@ -96,9 +179,12 @@ export default function SettingsPanel({ peers, socket, roomId, isHost, onClose, 
             </div>
           )}
 
-          {/* ── Room tab ── */}
-          {tab === 'room' && (
-            <div className={styles.section}>
+          {tab === "room" && (
+            <div
+              className={styles.section}
+              role="tabpanel"
+              aria-label="Room info"
+            >
               <span className={styles.sectionLabel}>Room info</span>
               <div className={styles.infoRow}>
                 <span>Room ID</span>
@@ -106,8 +192,13 @@ export default function SettingsPanel({ peers, socket, roomId, isHost, onClose, 
               </div>
               <div className={styles.infoRow}>
                 <span>Link</span>
-                <button className={styles.copyLinkBtn}
-                  onClick={() => navigator.clipboard.writeText(window.location.href)}>
+                <button
+                  className={styles.copyLinkBtn}
+                  aria-label="Copy meeting invite link to clipboard"
+                  onClick={() =>
+                    navigator.clipboard.writeText(window.location.href)
+                  }
+                >
                   📋 Copy invite link
                 </button>
               </div>
@@ -118,27 +209,43 @@ export default function SettingsPanel({ peers, socket, roomId, isHost, onClose, 
             </div>
           )}
 
-          {/* ── Advanced tab ── */}
-          {tab === 'advanced' && (
-            <div className={styles.section}>
+          {tab === "advanced" && (
+            <div
+              className={styles.section}
+              role="tabpanel"
+              aria-label="Advanced settings and shortcuts"
+            >
               <span className={styles.sectionLabel}>Keyboard shortcuts</span>
-              {[
-                ['Ctrl+Z / Cmd+Z', 'Undo (whiteboard)'],
-                ['Ctrl+Y / Cmd+Y', 'Redo (whiteboard)'],
-                ['P', 'Switch to pen'],
-                ['E', 'Switch to eraser'],
-                ['Delete / Backspace', 'Delete selected image'],
-                ['Ctrl+V', 'Paste image into whiteboard'],
-              ].map(([key, desc]) => (
-                <div key={key} className={styles.shortcutRow}>
-                  <code className={styles.kbd}>{key}</code>
-                  <span>{desc}</span>
-                </div>
-              ))}
+              <dl>
+                {[
+                  ["Ctrl+Z / Cmd+Z", "Undo (whiteboard)"],
+                  ["Ctrl+Y / Cmd+Y", "Redo (whiteboard)"],
+                  ["P", "Switch to pen"],
+                  ["E", "Switch to eraser"],
+                  ["Delete / Backspace", "Delete selected image"],
+                  ["Ctrl+V", "Paste image into whiteboard"],
+                ].map(([key, desc]) => (
+                  <div key={key} className={styles.shortcutRow}>
+                    <dt>
+                      <code className={styles.kbd}>{key}</code>
+                    </dt>
+                    <dd>{desc}</dd>
+                  </div>
+                ))}
+              </dl>
 
-              <span className={styles.sectionLabel} style={{marginTop: 16}}>About</span>
+              <span className={styles.sectionLabel} style={{ marginTop: 16 }}>
+                About
+              </span>
               <div className={styles.about}>
-                <span className={styles.aboutLogo}><img src="/logo.png" alt="QuantumMeet" className={styles.aboutLogoImage} /> QuantumMeet</span>
+                <span className={styles.aboutLogo}>
+                  <img
+                    src="/logo.png"
+                    alt="QuantumMeet logo"
+                    className={styles.aboutLogoImage}
+                  />
+                  QuantumMeet
+                </span>
                 <p>WebRTC · Socket.io · React · Node.js</p>
                 <p>End-to-end encrypted peer connections via STUN/TURN.</p>
               </div>
