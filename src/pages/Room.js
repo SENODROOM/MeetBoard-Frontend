@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { io } from "socket.io-client";
+import { createRealtimeClient } from "../lib/realtimeClient";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { useMeetingRecorder } from "../hooks/useMeetingRecorder";
 import { useSounds } from "../hooks/useSounds";
@@ -20,7 +20,6 @@ import QnAPanel from "../components/QnAPanel";
 import styles from "./Room.module.css";
 
 const API = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
-const SOCKET_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
 
 export default function Room() {
   const { roomId } = useParams();
@@ -200,13 +199,7 @@ export default function Room() {
   // ── Socket init ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!nameConfirmed) return;
-    const s = io(SOCKET_URL, {
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-    });
+    const s = createRealtimeClient({ roomId, userId, userName });
     socketRef.current = s;
     setSocket(s);
 

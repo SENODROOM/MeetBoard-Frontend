@@ -1,9 +1,26 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { upload as blobUpload } from '@vercel/blob/client';
 import styles from './ClassroomPage.module.css';
 
 const API = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
+
+// Files upload straight to Vercel Blob from the browser (serverless functions
+// cap request bodies well under the 50MB this app allows) — this only sends
+// metadata to our API, never the file bytes.
+async function uploadFilesToBlob(classroomId, files) {
+  if (!files || files.length === 0) return [];
+  return Promise.all(
+    files.map(async (file) => {
+      const blob = await blobUpload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: `${API}/api/classrooms/${classroomId}/blob-upload`,
+      });
+      return { name: file.name, url: blob.url, pathname: blob.pathname, size: file.size, mime: file.type };
+    }),
+  );
+}
 
 const THEMES = {
   cyan:   { accent:'#00e5ff', bg:'linear-gradient(135deg,#020c14 0%,#061828 60%,#0a2438 100%)', border:'rgba(0,229,255,0.2)', muted:'rgba(0,229,255,0.1)', glow:'rgba(0,229,255,0.12)', card:'rgba(0,229,255,0.05)' },
@@ -50,7 +67,7 @@ function GradeBar({value,max=100,thin}){
   return <div className={styles.gradeBarWrap}><div className={styles.gradeBarTrack} style={thin?{height:3}:{}}><div className={styles.gradeBarFill} style={{width:`${p}%`,background:c}}/></div>{!thin&&<span style={{fontSize:10,fontWeight:700,color:c,minWidth:30,textAlign:'right',fontFamily:'var(--font-mono)'}}>{p}%</span>}</div>;
 }
 function FileCard({file,classroomId,onRemove}){
-  const href=file.filename?`${API}/api/classrooms/${classroomId}/files/${file.filename}`:undefined;
+  const href=file.url?`${API}/api/classrooms/${classroomId}/download?url=${encodeURIComponent(file.url)}`:undefined;
   return <a className={styles.fileCard} href={href} target="_blank" rel="noreferrer" onClick={!href?e=>e.preventDefault():undefined}>
     <span className={styles.fileCardIcon}>{fileIcon(file.mime||file.type)}</span>
     <div className={styles.fileCardInfo}><span className={styles.fileCardName}>{file.name}</span>{file.size&&<span className={styles.fileCardSize}>{fmtSize(file.size)}</span>}</div>
@@ -215,12 +232,11 @@ function StreamTab({classroomId,posts,setPosts,fetchPosts,isTeacher,userId,userN
   const handlePost=async()=>{
     if(!body.trim()&&!title.trim()) return;
     setPosting(true);
-    const fd=new FormData();
-    fd.append('type',type);fd.append('body',body);fd.append('authorId',userId);fd.append('authorName',userName);
-    if(title) fd.append('title',title);
-    if(scheduleDate) fd.append('scheduledFor',scheduleDate);
-    files.forEach(f=>fd.append('files',f));
-    try{const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',body:fd});const d=await r.json();setPosts(p=>[d,...p]);setCompose(false);setBody('');setTitle('');setFiles([]);setScheduleDate('');showToast('Posted!');}catch{}finally{setPosting(false);}
+    try{
+      const attachments=await uploadFilesToBlob(classroomId,files);
+      const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,body,authorId:userId,authorName:userName,title:title||undefined,scheduledFor:scheduleDate||undefined,attachments})});
+      const d=await r.json();setPosts(p=>[d,...p]);setCompose(false);setBody('');setTitle('');setFiles([]);setScheduleDate('');showToast('Posted!');
+    }catch{}finally{setPosting(false);}
   };
   const handlePin=async(postId,pinned)=>{
     await fetch(`${API}/api/classrooms/${classroomId}/posts/${postId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({pinned:!pinned})});
@@ -384,11 +400,11 @@ function AssignmentsTab({classroomId,posts,setPosts,fetchPosts,isTeacher,userId,
   const topics=[...new Set(filtered.map(a=>a.topic||'General'))];
   const handleCreate=async()=>{
     if(!form.title.trim()) return;setPosting(true);
-    const fd=new FormData();
-    Object.entries(form).forEach(([k,v])=>v&&fd.append(k,v));
-    fd.append('type','assignment');fd.append('authorId',userId);fd.append('authorName',userName);
-    files.forEach(f=>fd.append('files',f));
-    try{const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',body:fd});const d=await r.json();setPosts(p=>[d,...p]);setCreating(false);setForm({title:'',body:'',dueDate:'',points:'',topic:''});setFiles([]);showToast('Assignment created!');}catch{}finally{setPosting(false);}
+    try{
+      const attachments=await uploadFilesToBlob(classroomId,files);
+      const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...form,type:'assignment',authorId:userId,authorName:userName,attachments})});
+      const d=await r.json();setPosts(p=>[d,...p]);setCreating(false);setForm({title:'',body:'',dueDate:'',points:'',topic:''});setFiles([]);showToast('Assignment created!');
+    }catch{}finally{setPosting(false);}
   };
   const handleDelete=async(postId)=>{if(!window.confirm('Delete?')) return;await fetch(`${API}/api/classrooms/${classroomId}/posts/${postId}`,{method:'DELETE'});setPosts(p=>p.filter(x=>x.postId!==postId));showToast('Deleted');};
   if(selected){const post=assignments.find(p=>p.postId===selected);if(!post){setSelected(null);return null;}return<AssignmentReviewPanel classroomId={classroomId} post={post} isTeacher={isTeacher} userId={userId} userName={userName} th={th} onBack={()=>setSelected(null)} classroom={classroom} showToast={showToast}/>;}
@@ -475,9 +491,8 @@ function AssignmentReviewPanel({classroomId,post,isTeacher,userId,userName,th,on
   const handleSubmit=async()=>{
     if(!myComment.trim()&&myFiles.length===0) return;
     setSubmitting(true);
-    const fd=new FormData();fd.append('studentId',userId);fd.append('studentName',userName);fd.append('comment',myComment);
-    myFiles.forEach(f=>fd.append('files',f));
-    await fetch(`${API}/api/classrooms/${classroomId}/posts/${post.postId}/submissions`,{method:'POST',body:fd});
+    const attachments=await uploadFilesToBlob(classroomId,myFiles);
+    await fetch(`${API}/api/classrooms/${classroomId}/posts/${post.postId}/submissions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:userId,studentName:userName,comment:myComment,attachments})});
     setMyComment('');setMyFiles([]);setResubmit(false);fetchSubs();setSubmitting(false);showToast('Turned in! ✓','success');
   };
   const handleGrade=async(subId,grade,feedback,privateNote,status)=>{
@@ -845,7 +860,7 @@ function AttendanceTab({classroomId,classroom,sessions,th,showToast}){
 function MaterialsTab({classroomId,posts,setPosts,isTeacher,userId,userName,th,fetchPosts,showToast}){
   const[creating,setCreating]=useState(false);const[form,setForm]=useState({title:'',body:'',topic:''});const[files,setFiles]=useState([]);const[posting,setPosting]=useState(false);
   const materials=posts.filter(p=>p.type==='material');
-  const handleCreate=async()=>{if(!form.title.trim()) return;setPosting(true);const fd=new FormData();Object.entries(form).forEach(([k,v])=>v&&fd.append(k,v));fd.append('type','material');fd.append('authorId',userId);fd.append('authorName',userName);files.forEach(f=>fd.append('files',f));try{const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',body:fd});const d=await r.json();setPosts(p=>[d,...p]);setCreating(false);setForm({title:'',body:'',topic:''});setFiles([]);showToast('Material posted!');}catch{}finally{setPosting(false);};};
+  const handleCreate=async()=>{if(!form.title.trim()) return;setPosting(true);try{const attachments=await uploadFilesToBlob(classroomId,files);const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...form,type:'material',authorId:userId,authorName:userName,attachments})});const d=await r.json();setPosts(p=>[d,...p]);setCreating(false);setForm({title:'',body:'',topic:''});setFiles([]);showToast('Material posted!');}catch{}finally{setPosting(false);};};
   const handleDelete=async(postId)=>{if(!window.confirm('Delete?')) return;await fetch(`${API}/api/classrooms/${classroomId}/posts/${postId}`,{method:'DELETE'});setPosts(p=>p.filter(x=>x.postId!==postId));showToast('Deleted');};
   return(
     <div>
@@ -893,7 +908,7 @@ function QuizzesTab({classroomId,posts,setPosts,isTeacher,userId,userName,th,sho
   const updQ=(i,v)=>setQuestions(q=>q.map((x,j)=>j===i?{...x,...v}:x));
   const addOpt=(qi)=>setQuestions(q=>q.map((x,j)=>j===qi?{...x,options:[...x.options,'']}:x));
   const updOpt=(qi,oi,v)=>setQuestions(q=>q.map((x,j)=>j===qi?{...x,options:x.options.map((o,k)=>k===oi?v:o)}:x));
-  const handleCreate=async()=>{if(!form.title.trim()||!questions.length) return;setPosting(true);const fd=new FormData();Object.entries(form).forEach(([k,v])=>v&&fd.append(k,v));fd.append('type','quiz');fd.append('authorId',userId);fd.append('authorName',userName);fd.append('quizQuestions',JSON.stringify(questions.map(q=>({...q,text:q.text}))));try{const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',body:fd});const d=await r.json();setPosts(p=>[d,...p]);setCreating(false);setForm({title:'',body:''});setQuestions([{text:'',options:['',''],correct:0,points:1}]);showToast('Quiz created!');}catch{}finally{setPosting(false);};};
+  const handleCreate=async()=>{if(!form.title.trim()||!questions.length) return;setPosting(true);try{const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...form,type:'quiz',authorId:userId,authorName:userName,quizQuestions:questions.map(q=>({...q,text:q.text}))})});const d=await r.json();setPosts(p=>[d,...p]);setCreating(false);setForm({title:'',body:''});setQuestions([{text:'',options:['',''],correct:0,points:1}]);showToast('Quiz created!');}catch{}finally{setPosting(false);};};
   if(taking){const quiz=quizzes.find(p=>p.postId===taking);if(!quiz){setTaking(null);return null;}return<QuizTake quiz={quiz} classroomId={classroomId} userId={userId} userName={userName} th={th} onBack={()=>setTaking(null)} showToast={showToast}/>;}
   return(
     <div>
@@ -956,8 +971,7 @@ function QuizTake({quiz,classroomId,userId,userName,th,onBack,showToast}){
     setSubmitting(true);
     const ansArr=qs.map((_,i)=>answers[i]??-1);
     let sc=0;qs.forEach((q,i)=>{if(answers[i]===q.correct) sc+=(q.points||1);});
-    const fd=new FormData();fd.append('studentId',userId);fd.append('studentName',userName);fd.append('quizAnswers',JSON.stringify(ansArr));fd.append('quizScore',sc);fd.append('grade',Math.round((sc/total)*100));
-    await fetch(`${API}/api/classrooms/${classroomId}/posts/${quiz.postId}/submissions`,{method:'POST',body:fd});
+    await fetch(`${API}/api/classrooms/${classroomId}/posts/${quiz.postId}/submissions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:userId,studentName:userName,quizAnswers:ansArr,quizScore:sc,grade:Math.round((sc/total)*100)})});
     setScore(sc);setSubmitted(true);setSubmitting(false);showToast(`Quiz submitted! Score: ${sc}/${total}`);
   };
   if(submitted&&score!==null){
