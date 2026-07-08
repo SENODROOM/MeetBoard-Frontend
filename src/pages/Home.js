@@ -141,7 +141,6 @@ export default function Home() {
             ['home',    '🏠', 'Home'],
             ['live',    '🔴', 'Live'],
             ['secret',  '🎲', 'SecretMeet'],
-            ['class',   '🎓', 'Classrooms'],
           ].map(([id, icon, label]) => (
             <button key={id}
               className={`${styles.navTab} ${tab === id ? styles.navTabActive : ''}`}
