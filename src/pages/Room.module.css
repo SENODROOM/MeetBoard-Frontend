@@ -17,9 +17,9 @@
   flex-shrink: 0;
   z-index: 30;
   gap: 8px;
-  background: rgba(2, 5, 12, 0.98);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+  background: rgba(2, 6, 10, 0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .logo {
@@ -51,9 +51,9 @@
 
 .classroomPill {
   padding: 2px 8px;
-  background: rgba(157, 113, 255, 0.12);
-  border: 1px solid rgba(157, 113, 255, 0.25);
-  color: #b197fc;
+  background: rgba(42, 240, 255, 0.1);
+  border: 1px solid rgba(42, 240, 255, 0.22);
+  color: var(--accent);
   font-size: 9px;
   font-family: var(--font-mono, "Space Mono", monospace);
   border-radius: 4px;
@@ -80,9 +80,9 @@
 
 .privatePill {
   padding: 2px 7px;
-  background: rgba(157, 113, 255, 0.07);
-  border: 1px solid rgba(157, 113, 255, 0.18);
-  color: #b197fc;
+  background: rgba(61, 255, 168, 0.08);
+  border: 1px solid rgba(61, 255, 168, 0.22);
+  color: var(--accent2, #3dffa8);
   font-size: 9px;
   font-family: var(--font-mono, "Space Mono", monospace);
   border-radius: 4px;
