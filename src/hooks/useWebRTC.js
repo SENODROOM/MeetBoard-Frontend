@@ -12,15 +12,19 @@ export async function refreshMeshSoftCap() {
   try {
     const API = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
     const res = await fetch(`${API}/api/growth/features`);
-    if (!res.ok) return MESH_SOFT_CAP;
+    if (!res.ok) return { meshSoftCap: MESH_SOFT_CAP };
     const data = await res.json();
     if (Number.isFinite(Number(data.meshSoftCap))) {
       MESH_SOFT_CAP = Number(data.meshSoftCap);
     }
+    return {
+      meshSoftCap: MESH_SOFT_CAP,
+      sfuEnabled: !!data.sfuEnabled,
+      sfuThreshold: Number(data.sfuThreshold) || 12,
+    };
   } catch {
-    /* keep env default */
+    return { meshSoftCap: MESH_SOFT_CAP, sfuEnabled: false, sfuThreshold: 12 };
   }
-  return MESH_SOFT_CAP;
 }
 
 // ── Audio enhancement pipeline ───────────────────────────────────────────────
@@ -90,6 +94,8 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   // Feature 9: per-peer connection quality — socketId → 'good'|'fair'|'poor'
   const [peerQuality, setPeerQuality] = useState({});
   const [meshSoftCap, setMeshSoftCap] = useState(MESH_SOFT_CAP);
+  const [sfuEnabled, setSfuEnabled] = useState(false);
+  const [sfuThreshold, setSfuThreshold] = useState(12);
   const iceConfigRef = useRef(buildRtcConfiguration());
 
   const socketRef = useRef(socket);
@@ -105,8 +111,11 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     loadRtcConfiguration().then((cfg) => {
       if (!cancelled) iceConfigRef.current = cfg;
     });
-    refreshMeshSoftCap().then((cap) => {
-      if (!cancelled) setMeshSoftCap(cap);
+    refreshMeshSoftCap().then((feats) => {
+      if (cancelled) return;
+      setMeshSoftCap(feats.meshSoftCap);
+      setSfuEnabled(!!feats.sfuEnabled);
+      setSfuThreshold(feats.sfuThreshold || 12);
     });
     return () => {
       cancelled = true;
@@ -698,6 +707,9 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     peerQuality, // Feature 9: exposed so Room.js can pass quality to VideoTile
     meshCapExceeded: peers.length >= meshSoftCap,
     meshSoftCap,
+    sfuEnabled,
+    sfuThreshold,
+    sfuRecommended: sfuEnabled && peers.length >= sfuThreshold,
     audioEnabled,
     videoEnabled,
     screenSharing,

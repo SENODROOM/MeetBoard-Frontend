@@ -5,13 +5,37 @@ export default function SettingsPanel({
   peers,
   socket,
   roomId,
+  userId,
   isHost,
   onClose,
   wbPermissions,
   onWbPermChange,
 }) {
   const [tab, setTab] = useState("participants");
+  const [purgeState, setPurgeState] = useState("");
   const emit = (ev, data) => socket?.emit(ev, { roomId, ...data });
+  const API = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
+
+  const purgeRoom = async () => {
+    if (
+      !window.confirm(
+        "Purge chat, knocks, presence, and signaling events for this room?",
+      )
+    )
+      return;
+    setPurgeState("working");
+    try {
+      const roomToken = localStorage.getItem(`qm_room_token_${roomId}`);
+      const res = await fetch(`${API}/api/rooms/${roomId}/retention`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, roomToken }),
+      });
+      setPurgeState(res.ok ? "done" : "failed");
+    } catch {
+      setPurgeState("failed");
+    }
+  };
 
   return (
     <div
@@ -206,6 +230,25 @@ export default function SettingsPanel({
                 <span>Participants</span>
                 <span className={styles.badge}>{peers.length + 1}</span>
               </div>
+              {isHost && (
+                <div className={styles.infoRow} style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+                  <span className={styles.sectionLabel}>Retention</span>
+                  <button
+                    className={styles.bulkBtn}
+                    type="button"
+                    onClick={purgeRoom}
+                    disabled={purgeState === "working"}
+                  >
+                    {purgeState === "working"
+                      ? "Purging…"
+                      : purgeState === "done"
+                        ? "✓ Room data purged"
+                        : purgeState === "failed"
+                          ? "Purge failed — retry"
+                          : "🗑 Purge room ephemeral data"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

@@ -9,6 +9,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ClassroomDashboard from "./pages/classroom/ClassroomDashboard";
 import ClassroomPage from "./pages/classroom/ClassroomPage";
+import OrgsPage from "./pages/Orgs";
+import AdminPage from "./pages/Admin";
 import "./App.css";
 
 export default function App() {
@@ -43,6 +45,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ClassroomPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/orgs"
+            element={
+              <ProtectedRoute>
+                <OrgsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminPage />
               </ProtectedRoute>
             }
           />

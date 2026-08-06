@@ -153,6 +153,22 @@ export default function Home() {
           ))}
         </div>
         <div className={styles.navRight}>
+          <button
+            type="button"
+            className={styles.navTab}
+            onClick={() => navigate("/classrooms")}
+            data-testid="nav-classrooms"
+          >
+            🎓 Classes
+          </button>
+          <button
+            type="button"
+            className={styles.navTab}
+            onClick={() => navigate("/orgs")}
+            data-testid="nav-orgs"
+          >
+            🏢 Orgs
+          </button>
           {userName && (
             <div className={styles.userChip}>
               <div className={styles.userAvatar}>{userName[0].toUpperCase()}</div>
@@ -190,15 +206,17 @@ export default function Home() {
             <div className={styles.inputGroup}>
               <label className={styles.inputLabel}>Your name</label>
               <input className={styles.input} type="text" placeholder="e.g. Alex Johnson"
+                data-testid="home-name"
                 value={userName} onChange={e => { setUserName(e.target.value); setError(''); }} />
             </div>
 
-            {error && <div className={styles.errorBox}>{error}</div>}
+            {error && <div className={styles.errorBox} data-testid="home-error">{error}</div>}
 
             {!createdData ? (<>
               <div className={styles.inputGroup}>
                 <label className={styles.inputLabel}>Meeting title <span className={styles.optional}>(optional)</span></label>
                 <input className={styles.input} type="text" placeholder="e.g. Weekly Standup"
+                  data-testid="home-title"
                   value={meetingTitle} onChange={e => setMeetingTitle(e.target.value)} />
               </div>
 
@@ -220,7 +238,7 @@ export default function Home() {
                 ))}
               </div>
 
-              <button className={styles.btnPrimary} onClick={handleCreate} disabled={loading}>
+              <button className={styles.btnPrimary} onClick={handleCreate} disabled={loading} data-testid="home-create">
                 {loading ? <span className={styles.spinner}/> : <>＋ New Meeting</>}
               </button>
 
@@ -228,12 +246,13 @@ export default function Home() {
 
               <div className={styles.joinRow}>
                 <input className={styles.input} type="text" placeholder="Meeting code or invite link"
+                  data-testid="home-join-code"
                   value={joinCode} onChange={e => setJoinCode(e.target.value)}
                   onKeyDown={e => e.key==='Enter' && handleJoin()} style={{flex:1}} />
-                <button className={styles.btnJoin} onClick={handleJoin}>Join →</button>
+                <button className={styles.btnJoin} onClick={handleJoin} data-testid="home-join">Join →</button>
               </div>
             </>) : (
-              <div className={styles.linkBox}>
+              <div className={styles.linkBox} data-testid="home-created">
                 <div className={styles.successIcon}>✓</div>
                 <p className={styles.linkLabel}>Your meeting is ready!</p>
                 <div className={styles.linkCard}>
@@ -243,7 +262,7 @@ export default function Home() {
                 {!createdData.isPublic && (
                   <div className={styles.privateNote}>🔒 Private — guests must be admitted by you</div>
                 )}
-                <button className={styles.btnPrimary} onClick={handleGoToRoom}>Join Now →</button>
+                <button className={styles.btnPrimary} onClick={handleGoToRoom} data-testid="home-enter-room">Join Now →</button>
                 <button className={styles.btnGhost} onClick={() => setCreatedData(null)}>Create another</button>
               </div>
             )}

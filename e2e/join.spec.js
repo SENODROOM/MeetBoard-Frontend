@@ -1,11 +1,14 @@
 const { test, expect } = require("@playwright/test");
 
-test.describe("Meeting join path", () => {
-  test("can open create/join UI from home", async ({ page }) => {
+test.describe("Meeting create path", () => {
+  test("create meeting reaches ready state", async ({ page }) => {
+    test.setTimeout(90_000);
     await page.goto("/");
-    const create = page.getByRole("button", { name: /create|new meeting|start/i });
-    const join = page.getByRole("button", { name: /join/i });
-    const anyCta = create.or(join).or(page.locator("input, button").first());
-    await expect(anyCta.first()).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("home-name").fill("E2E Host");
+    await page.getByTestId("home-create").click();
+    await expect(page.getByTestId("home-created")).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId("home-enter-room")).toBeVisible();
   });
 });
