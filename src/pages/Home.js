@@ -156,48 +156,53 @@ export default function Home() {
 
   return (
     <div className={styles.page}>
-      {/* Background */}
-      <div className={styles.bg}>
-        <div className={styles.orb1}/><div className={styles.orb2}/><div className={styles.orb3}/>
-        <div className={styles.grid}/>
-        <div className={styles.scanline}/>
+      <div className={styles.bg} aria-hidden="true">
+        <div className={styles.aurora} />
+        <div className={styles.orb1} />
+        <div className={styles.orb2} />
+        <div className={styles.grid} />
+        <div className={styles.vignette} />
       </div>
 
-      {/* Nav */}
       <nav className={styles.nav}>
         <div className={styles.logo}>
-          <img src="/logo.png" alt="QuantumMeet" className={styles.logoImage} />
-          <span>Quantum<strong>Meet</strong></span>
+          <img src="/logo.png" alt="" className={styles.logoImage} />
+          <span>
+            Quantum<strong>Meet</strong>
+          </span>
         </div>
         <div className={styles.navTabs}>
           {[
-            ['home',    '🏠', 'Home'],
-            ['live',    '🔴', 'Live'],
-            ['secret',  '🎲', 'SecretMeet'],
-          ].map(([id, icon, label]) => (
-            <button key={id}
-              className={`${styles.navTab} ${tab === id ? styles.navTabActive : ''}`}
-              onClick={() => id === 'class' ? navigate('/classrooms') : setTab(id)}>
-              <span>{icon}</span> {label}
+            ["home", "Home"],
+            ["live", "Live"],
+            ["secret", "SecretMeet"],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={`${styles.navTab} ${tab === id ? styles.navTabActive : ""}`}
+              onClick={() => setTab(id)}
+            >
+              {label}
             </button>
           ))}
         </div>
         <div className={styles.navRight}>
           <button
             type="button"
-            className={styles.navTab}
+            className={styles.navLink}
             onClick={() => navigate("/classrooms")}
             data-testid="nav-classrooms"
           >
-            🎓 Classes
+            Classes
           </button>
           <button
             type="button"
-            className={styles.navTab}
+            className={styles.navLink}
             onClick={() => navigate("/orgs")}
             data-testid="nav-orgs"
           >
-            🏢 Orgs
+            Orgs
           </button>
           {userName && (
             <div className={styles.userChip}>
@@ -208,140 +213,225 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* ── HOME TAB ── */}
-      {tab === 'home' && (
+      {tab === "home" && (
         <main className={styles.main}>
-          <div className={styles.hero}>
-            <div className={styles.heroBadge}>
-              <span className={styles.badgeDot}/> WebRTC · End-to-End Encrypted
-            </div>
+          <section className={styles.hero}>
+            <p className={styles.brandMark}>QuantumMeet</p>
             <h1 className={styles.title}>
-              The future of<br/>
-              <span className={styles.gradient}>video meetings</span>
+              Meet at the
+              <br />
+              <span className={styles.gradient}>speed of light</span>
             </h1>
             <p className={styles.subtitle}>
-              Crystal-clear HD calls. Zero downloads. Just share a link and connect instantly.
+              HD WebRTC calls in the browser — share a link and you&apos;re in.
             </p>
-            <div className={styles.heroStats}>
-              {[['🔒','Secure','E2E WebRTC'],['⚡','Instant','No signup'],['🎓','Classes','Full LMS'],['🎲','Random','SecretMeet']].map(([i,t,d])=>(
-                <div key={t} className={styles.stat}>
-                  <span>{i}</span><strong>{t}</strong><small>{d}</small>
-                </div>
-              ))}
+            <div className={styles.heroCtas}>
+              <a className={styles.ctaGhost} href="#start">
+                Start a call
+              </a>
             </div>
-          </div>
+          </section>
 
-          <div className={styles.card}>
-            {/* Name input */}
+          <section id="start" className={styles.card} aria-label="Start or join a meeting">
             <div className={styles.inputGroup}>
-              <label className={styles.inputLabel}>Your name</label>
-              <input className={styles.input} type="text" placeholder="e.g. Alex Johnson"
+              <label className={styles.inputLabel} htmlFor="home-name">
+                Your name
+              </label>
+              <input
+                id="home-name"
+                className={styles.input}
+                type="text"
+                placeholder="e.g. Alex Johnson"
                 data-testid="home-name"
-                value={userName} onChange={e => { setUserName(e.target.value); setError(''); }} />
+                value={userName}
+                onChange={(e) => {
+                  setUserName(e.target.value);
+                  setError("");
+                }}
+              />
             </div>
 
-            {error && <div className={styles.errorBox} data-testid="home-error">{error}</div>}
-
-            {!createdData ? (<>
-              <div className={styles.inputGroup}>
-                <label className={styles.inputLabel}>Meeting title <span className={styles.optional}>(optional)</span></label>
-                <input className={styles.input} type="text" placeholder="e.g. Weekly Standup"
-                  data-testid="home-title"
-                  value={meetingTitle} onChange={e => setMeetingTitle(e.target.value)} />
-              </div>
-
-              <div className={styles.typeToggle}>
-                {[
-                  ['public','🌐','Public','Anyone can join · Listed in Live'],
-                  ['private','🔒','Private','Invite only · Host approves entry'],
-                ].map(([v, icon, label, desc]) => (
-                  <button key={v}
-                    className={`${styles.typeBtn} ${roomType===v ? (v==='public'?styles.typeBtnActive:styles.typeBtnPrivate) : ''}`}
-                    onClick={() => setRoomType(v)}>
-                    <span className={styles.typeIcon}>{icon}</span>
-                    <div className={styles.typeMeta}>
-                      <strong>{label}</strong>
-                      <span>{desc}</span>
-                    </div>
-                    {roomType===v && <span className={styles.typeCheck}>✓</span>}
-                  </button>
-                ))}
-              </div>
-
-              <button className={styles.btnPrimary} onClick={handleCreate} disabled={loading} data-testid="home-create">
-                {loading ? <span className={styles.spinner}/> : <>＋ New Meeting</>}
-              </button>
-
-              <div className={styles.divider}><span>or join existing</span></div>
-
-              <div className={styles.joinRow}>
-                <input className={styles.input} type="text" placeholder="Meeting code or invite link"
-                  data-testid="home-join-code"
-                  value={joinCode} onChange={e => setJoinCode(e.target.value)}
-                  onKeyDown={e => e.key==='Enter' && handleJoin()} style={{flex:1}} />
-                <button className={styles.btnJoin} onClick={handleJoin} data-testid="home-join">Join →</button>
-              </div>
-            </>) : (
-              <div className={styles.linkBox} data-testid="home-created">
-                <div className={styles.successIcon}>✓</div>
-                <p className={styles.linkLabel}>Your meeting is ready!</p>
-                <div className={styles.linkCard}>
-                  <code className={styles.linkText}>{createdData.link}</code>
-                  <button className={styles.copyBtn} onClick={handleCopy}>{copied ? '✓' : '📋'}</button>
-                </div>
-                {!createdData.isPublic && (
-                  <div className={styles.privateNote}>🔒 Private — guests must be admitted by you</div>
-                )}
-                <button className={styles.btnPrimary} onClick={handleGoToRoom} data-testid="home-enter-room">Join Now →</button>
-                <button className={styles.btnGhost} onClick={() => setCreatedData(null)}>Create another</button>
+            {error && (
+              <div className={styles.errorBox} data-testid="home-error" role="alert">
+                {error}
               </div>
             )}
-          </div>
+
+            {!createdData ? (
+              <>
+                <div className={styles.inputGroup}>
+                  <label className={styles.inputLabel} htmlFor="home-title">
+                    Meeting title <span className={styles.optional}>(optional)</span>
+                  </label>
+                  <input
+                    id="home-title"
+                    className={styles.input}
+                    type="text"
+                    placeholder="e.g. Weekly Standup"
+                    data-testid="home-title"
+                    value={meetingTitle}
+                    onChange={(e) => setMeetingTitle(e.target.value)}
+                  />
+                </div>
+
+                <div className={styles.typeToggle} role="group" aria-label="Room visibility">
+                  {[
+                    ["public", "Public", "Listed · anyone can join"],
+                    ["private", "Private", "Invite only · host admits"],
+                  ].map(([v, label, desc]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      className={`${styles.typeBtn} ${
+                        roomType === v
+                          ? v === "public"
+                            ? styles.typeBtnActive
+                            : styles.typeBtnPrivate
+                          : ""
+                      }`}
+                      onClick={() => setRoomType(v)}
+                    >
+                      <div className={styles.typeMeta}>
+                        <strong>{label}</strong>
+                        <span>{desc}</span>
+                      </div>
+                      {roomType === v && <span className={styles.typeCheck} aria-hidden="true" />}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  className={styles.btnPrimary}
+                  onClick={handleCreate}
+                  disabled={loading}
+                  data-testid="home-create"
+                  type="button"
+                >
+                  {loading ? <span className={styles.spinner} /> : "New meeting"}
+                </button>
+
+                <div className={styles.divider}>
+                  <span>or join</span>
+                </div>
+
+                <div className={styles.joinRow}>
+                  <input
+                    className={styles.input}
+                    type="text"
+                    placeholder="Code or invite link"
+                    data-testid="home-join-code"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleJoin()}
+                    style={{ flex: 1 }}
+                    aria-label="Meeting code or invite link"
+                  />
+                  <button
+                    className={styles.btnJoin}
+                    onClick={handleJoin}
+                    data-testid="home-join"
+                    type="button"
+                  >
+                    Join
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className={styles.linkBox} data-testid="home-created">
+                <div className={styles.successIcon} aria-hidden="true">
+                  ✓
+                </div>
+                <p className={styles.linkLabel}>Your meeting is ready</p>
+                <div className={styles.linkCard}>
+                  <code className={styles.linkText}>{createdData.link}</code>
+                  <button className={styles.copyBtn} onClick={handleCopy} type="button" aria-label="Copy link">
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                {!createdData.isPublic && (
+                  <div className={styles.privateNote}>Private — guests wait for your admit</div>
+                )}
+                <button
+                  className={styles.btnPrimary}
+                  onClick={handleGoToRoom}
+                  data-testid="home-enter-room"
+                  type="button"
+                >
+                  Enter room
+                </button>
+                <button className={styles.btnGhost} onClick={() => setCreatedData(null)} type="button">
+                  Create another
+                </button>
+              </div>
+            )}
+          </section>
         </main>
       )}
 
-      {/* ── LIVE TAB ── */}
-      {tab === 'live' && (
+      {tab === "live" && (
         <main className={styles.main}>
           <div className={styles.tabHeader}>
             <div>
-              <h2 className={styles.tabTitle}>🔴 Live Public Meetings</h2>
-              <p className={styles.tabSubtitle}>Join any active public meeting right now</p>
+              <h2 className={styles.tabTitle}>Live meetings</h2>
+              <p className={styles.tabSubtitle}>Public rooms you can join right now</p>
             </div>
-            <button className={styles.refreshBtn} onClick={fetchLive} disabled={liveLoading}>
-              {liveLoading ? <span className={styles.spinnerSm}/> : '↺'} Refresh
+            <button
+              className={styles.refreshBtn}
+              onClick={fetchLive}
+              disabled={liveLoading}
+              type="button"
+            >
+              {liveLoading ? <span className={styles.spinnerSm} /> : null}
+              Refresh
             </button>
           </div>
 
           {!userName.trim() && (
             <div className={styles.namePrompt}>
-              <input className={styles.input} type="text" placeholder="Enter your name to join"
-                value={userName} onChange={e => setUserName(e.target.value)} />
+              <input
+                className={styles.input}
+                type="text"
+                placeholder="Enter your name to join"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                aria-label="Your name"
+              />
             </div>
           )}
 
           {liveLoading ? (
-            <div className={styles.centerState}><span className={styles.spinnerLg}/><span>Scanning for live meetings…</span></div>
+            <div className={styles.centerState}>
+              <span className={styles.spinnerLg} />
+              <span>Looking for live meetings…</span>
+            </div>
           ) : liveRooms.length === 0 ? (
             <div className={styles.centerState}>
-              <span className={styles.emptyIcon}>📡</span>
-              <strong>No live meetings right now</strong>
-              <span>Create a public meeting to appear here.</span>
+              <strong>No live meetings</strong>
+              <span>Create a public meeting to show up here.</span>
             </div>
           ) : (
             <div className={styles.liveGrid}>
-              {liveRooms.map(room => (
+              {liveRooms.map((room) => (
                 <div key={room.roomId} className={styles.liveCard}>
                   <div className={styles.liveCardTop}>
-                    <div className={styles.liveDot}/><span className={styles.liveLabel}>LIVE</span>
-                    <span className={styles.liveCount}>👥 {room.participantCount}</span>
+                    <div className={styles.liveDot} />
+                    <span className={styles.liveLabel}>LIVE</span>
+                    <span className={styles.liveCount}>{room.participantCount}</span>
                   </div>
-                  <h3 className={styles.liveCardTitle}>{room.title || `${room.hostName}'s Meeting`}</h3>
+                  <h3 className={styles.liveCardTitle}>
+                    {room.title || `${room.hostName}'s Meeting`}
+                  </h3>
                   <p className={styles.liveCardHost}>Hosted by {room.hostName}</p>
                   <code className={styles.liveCardId}>{room.roomId}</code>
-                  <button className={styles.joinLiveBtn}
-                    onClick={() => { localStorage.setItem('qm_userName', userName); navigate(`/room/${room.roomId}`); }}>
-                    Join Meeting →
+                  <button
+                    className={styles.joinLiveBtn}
+                    type="button"
+                    onClick={() => {
+                      localStorage.setItem("qm_userName", userName);
+                      navigate(`/room/${room.roomId}`);
+                    }}
+                  >
+                    Join meeting
                   </button>
                 </div>
               ))}
@@ -350,81 +440,82 @@ export default function Home() {
         </main>
       )}
 
-      {/* ── SECRETMEET TAB ── */}
-      {tab === 'secret' && (
+      {tab === "secret" && (
         <main className={styles.main}>
           <div className={styles.secretWrap}>
-            <div className={styles.secretGlow}/>
+            <div className={styles.secretGlow} aria-hidden="true" />
             <div className={styles.secretCard}>
-              <div className={styles.secretIcon}>🎲</div>
+              <p className={styles.secretEyebrow}>Spontaneous</p>
               <h2 className={styles.secretTitle}>SecretMeet</h2>
               <p className={styles.secretDesc}>
-                Get matched with a random stranger for a spontaneous 1-on-1 conversation.
-                You never know who you'll meet next.
+                Pair with someone new for a one-to-one call. No profiles. No history. Just the moment.
               </p>
 
-              {secretState === 'idle' && (<>
-                {!userName.trim() && (
-                  <input className={styles.input} type="text" placeholder="Enter your name first"
-                    value={userName} onChange={e => setUserName(e.target.value)} style={{marginBottom:12}} />
-                )}
-                <div className={styles.secretRules}>
-                  <div className={styles.secretRule}><span>👤</span> Anonymous pairing</div>
-                  <div className={styles.secretRule}><span>🎲</span> Completely random</div>
-                  <div className={styles.secretRule}><span>⏱</span> Instant connection</div>
-                  <div className={styles.secretRule}><span>🔒</span> P2P encrypted</div>
-                </div>
-                <button className={styles.secretBtn} onClick={joinSecretQueue} disabled={!userName.trim()}>
-                  🎲 Find a random match
-                </button>
-                <p style={{marginTop:16,fontSize:12,opacity:.7,textAlign:'center'}}>
-                  Moderation: use Report / Block after a match if needed. SecretMeet stays with rate limits + blocks.
-                </p>
-              </>)}
+              {secretState === "idle" && (
+                <>
+                  {!userName.trim() && (
+                    <input
+                      className={styles.input}
+                      type="text"
+                      placeholder="Enter your name first"
+                      value={userName}
+                      onChange={(e) => setUserName(e.target.value)}
+                      style={{ marginBottom: 12 }}
+                      aria-label="Your name"
+                    />
+                  )}
+                  <ul className={styles.secretRules}>
+                    <li className={styles.secretRule}>Anonymous pairing</li>
+                    <li className={styles.secretRule}>Instant P2P connect</li>
+                    <li className={styles.secretRule}>Report or block anytime</li>
+                  </ul>
+                  <button
+                    className={styles.secretBtn}
+                    onClick={joinSecretQueue}
+                    disabled={!userName.trim()}
+                    type="button"
+                  >
+                    Find a match
+                  </button>
+                </>
+              )}
 
-              {secretState === 'waiting' && (
+              {secretState === "waiting" && (
                 <div className={styles.secretWaiting}>
                   <div className={styles.secretPulse}>
-                    <div className={styles.secretPulseRing}/>
-                    <div className={styles.secretPulseRing} style={{animationDelay:'0.5s'}}/>
-                    <div className={styles.secretPulseRing} style={{animationDelay:'1s'}}/>
-                    <span className={styles.secretPulseIcon}>🎲</span>
+                    <div className={styles.secretPulseRing} />
+                    <div className={styles.secretPulseRing} style={{ animationDelay: "0.5s" }} />
+                    <div className={styles.secretPulseRing} style={{ animationDelay: "1s" }} />
+                    <span className={styles.secretPulseIcon} aria-hidden="true" />
                   </div>
                   <p className={styles.secretWaitText}>Finding your match…</p>
-                  <p className={styles.secretWaitSub}>Searching the globe for someone to connect with</p>
-                  <button className={styles.secretCancelBtn} onClick={leaveSecretQueue}>Cancel</button>
+                  <p className={styles.secretWaitSub}>Hang tight — this usually takes seconds</p>
+                  <button className={styles.secretCancelBtn} onClick={leaveSecretQueue} type="button">
+                    Cancel
+                  </button>
                 </div>
               )}
 
-              {secretState === 'matched' && (
+              {secretState === "matched" && (
                 <div className={styles.secretMatched}>
-                  <div className={styles.matchedIcon}>🎉</div>
-                  <h3>Match found!</h3>
-                  <p>You're being connected with <strong>{secretPartner}</strong></p>
-                  <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:12}}>
-                    <button type="button" className={styles.secretCancelBtn} onClick={reportSecretPartner}>Report</button>
-                    <button type="button" className={styles.secretCancelBtn} onClick={blockSecretPartner}>Block</button>
+                  <h3>Match found</h3>
+                  <p>
+                    Connecting with <strong>{secretPartner}</strong>
+                  </p>
+                  <div className={styles.secretModRow}>
+                    <button type="button" className={styles.secretCancelBtn} onClick={reportSecretPartner}>
+                      Report
+                    </button>
+                    <button type="button" className={styles.secretCancelBtn} onClick={blockSecretPartner}>
+                      Block
+                    </button>
                   </div>
-                  <div className={styles.matchedBar}><div className={styles.matchedBarFill}/></div>
+                  <div className={styles.matchedBar}>
+                    <div className={styles.matchedBarFill} />
+                  </div>
                   <p className={styles.matchedSub}>Joining room…</p>
                 </div>
               )}
-            </div>
-
-            <div className={styles.secretHowWorks}>
-              <h3>How it works</h3>
-              <div className={styles.howSteps}>
-                {[
-                  ['1','Click Find',      'Join the matching queue'],
-                  ['2','Wait briefly',    'We find someone online'],
-                  ['3','Connect',         '1-on-1 private call starts'],
-                ].map(([n,t,d]) => (
-                  <div key={n} className={styles.howStep}>
-                    <div className={styles.howNum}>{n}</div>
-                    <div><strong>{t}</strong><span>{d}</span></div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </main>
@@ -432,3 +523,4 @@ export default function Home() {
     </div>
   );
 }
+
