@@ -897,7 +897,7 @@ export default function Room() {
             borderRadius: 10,
             background: "rgba(15,23,42,.92)",
             border: "1px solid rgba(251,191,36,.35)",
-            color: "#fde68a",
+            color: "var(--amber-text, #ffd27a)",
             fontSize: 13,
             boxShadow: "0 8px 24px rgba(0,0,0,.35)",
           }}
@@ -914,7 +914,7 @@ export default function Room() {
             style={{
               background: "transparent",
               border: "none",
-              color: "#fde68a",
+              color: "var(--amber-text, #ffd27a)",
               cursor: "pointer",
               fontSize: 16,
               lineHeight: 1,

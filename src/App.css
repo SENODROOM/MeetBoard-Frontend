@@ -20,6 +20,8 @@
   --accent4:#ff6f3c;
   --red:#ff4a5e;
   --amber:#ffbe3c;
+  /* WCAG-safer warning text on dark surfaces (≥4.5:1 vs --surface) */
+  --amber-text:#ffd27a;
   --text:#eef4ff;
   --text-2:#7a95b8;
   --text-3:#384f68;
@@ -30,6 +32,15 @@
   --radius:10px;
   --radius-lg:16px;
   --radius-xl:22px;
+  --space-1:4px;
+  --space-2:8px;
+  --space-3:12px;
+  --space-4:16px;
+  --space-5:24px;
+  --space-6:32px;
+  --z-chrome:30;
+  --z-overlay:40;
+  --z-modal:50;
   --glow:0 0 32px rgba(0,229,255,0.18);
   --glow2:0 0 32px rgba(157,113,255,0.18);
   --shadow:0 4px 24px rgba(0,0,0,0.55);
