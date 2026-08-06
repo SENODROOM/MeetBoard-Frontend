@@ -246,7 +246,7 @@ export default function SettingsPanel({
                   />
                   QuantumMeet
                 </span>
-                <p>WebRTC · Socket.io · React · Node.js</p>
+                <p>WebRTC · React · Node.js</p>
                 <p>End-to-end encrypted peer connections via STUN/TURN.</p>
               </div>
             </div>

@@ -1,19 +1,15 @@
-import * as Ably from "ably";
+import { v4 as uuidv4 } from "uuid";
 
 const API = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
 
-// Vercel can't host a persistent Socket.io server, so this client talks to
-// Ably (managed pub/sub + presence) instead. To avoid touching every
-// component that used to call `socket.emit`/`socket.on`, this factory
-// returns an object with the same shape (`emit`, `on`, `off`, `id`,
-// `disconnect`) — callers don't need to change.
-//
-// Identity: Ably's `clientId` is set to our app's userId, so anywhere the
-// old code used a socket.io `socketId` to address a peer, that value is now
-// simply the peer's userId — the two concepts are unified.
+// Vercel can't host Socket.io. Signaling + room fan-out use a Mongo-backed
+// event bus polled over REST. Media stays WebRTC P2P. This factory keeps the
+// socket-shaped API (`emit` / `on` / `off` / `id` / `disconnect`) so Room and
+// useWebRTC don't need to change. Peer addressing uses userId as socketId.
 
-// Server used to relay `socket.on(X)` straight into a renamed `.emit(Y)`.
-// Same renames, done client-side now.
+const POLL_MS = 500;
+const HEARTBEAT_MS = 8_000;
+
 const RELAY_RENAME = {
   "toggle-audio": (d, selfId) => [
     "peer-audio-toggle",
@@ -40,7 +36,6 @@ const RELAY_RENAME = {
   ],
 };
 
-// Relayed to the room unchanged (some carry a `to` for point-to-point).
 const DIRECT_BROADCAST = new Set([
   "offer",
   "answer",
@@ -87,9 +82,17 @@ async function getJSON(url) {
 }
 
 export function createRealtimeClient({ roomId, userId, userName }) {
-  const listeners = new Map(); // event -> Set<fn>
-  const clientConnCounts = new Map(); // clientId -> Set<connectionId>
+  const listeners = new Map();
+  const connectionId = uuidv4();
   let hasEnteredPresence = false;
+  let closed = false;
+  let roomSince = new Date().toISOString();
+  let secretSince = new Date().toISOString();
+  let pollTimer = null;
+  let heartbeatTimer = null;
+  let cursorTimer = null;
+  let pendingCursor = null;
+  let polling = false;
 
   const dispatch = (event, data) => {
     listeners.get(event)?.forEach((fn) => {
@@ -101,92 +104,122 @@ export function createRealtimeClient({ roomId, userId, userName }) {
     });
   };
 
-  const ably = new Ably.Realtime({
-    authCallback: async (_params, cb) => {
-      try {
-        const tokenRequest = await postJSON("/api/realtime/token", {
-          userId,
-          roomId,
-        });
-        cb(null, tokenRequest);
-      } catch (err) {
-        cb(err, null);
+  const publishEvent = async (event, payload) => {
+    if (!roomId || closed) return;
+    await postJSON(`/api/rooms/${roomId}/events`, {
+      event,
+      payload: payload || {},
+      from: userId,
+      to: payload?.to ?? null,
+    });
+  };
+
+  const publishRoomEvent = (event, payload) => {
+    if (event === "wb-cursor") {
+      pendingCursor = payload;
+      if (!cursorTimer) {
+        cursorTimer = setTimeout(() => {
+          cursorTimer = null;
+          const p = pendingCursor;
+          pendingCursor = null;
+          if (p) publishEvent("wb-cursor", p).catch(() => {});
+        }, 80);
       }
-    },
-    clientId: userId,
-    echoMessages: false, // mirrors socket.to(room).emit(...) excluding the sender
-  });
+      return;
+    }
+    publishEvent(event, payload).catch(() => {});
+  };
 
-  // `roomId` is optional — Home.js's SecretMeet queue has no room yet, only
-  // needs its personal `secret:{userId}` inbox until a match hands it one.
-  const channel = roomId ? ably.channels.get("room:" + roomId) : null;
-  const secretChannel = ably.channels.get("secret:" + userId);
-
-  // ── Generic channel messages (broadcast + targeted-via-`to`) ───────────────
-  if (channel) {
-    channel.subscribe((msg) => {
-      if (msg.data && msg.data.to && msg.data.to !== userId) return; // not for me
-      dispatch(msg.name, msg.data);
-    });
-
-    // ── Presence → user-joined / user-rejoined / user-left ───────────────────
-    channel.presence.subscribe("enter", (msg) => {
-      if (msg.clientId === userId) return;
-      const seen = clientConnCounts.has(msg.clientId);
-      if (!clientConnCounts.get(msg.clientId))
-        clientConnCounts.set(msg.clientId, new Set());
-      clientConnCounts.get(msg.clientId).add(msg.connectionId);
-      dispatch(seen ? "user-rejoined" : "user-joined", {
-        socketId: msg.clientId,
-        userId: msg.clientId,
-        userName: msg.data?.userName,
-      });
-    });
-    channel.presence.subscribe("leave", (msg) => {
-      const set = clientConnCounts.get(msg.clientId);
-      if (!set) return;
-      set.delete(msg.connectionId);
-      if (set.size === 0) {
-        clientConnCounts.delete(msg.clientId);
-        dispatch("user-left", { socketId: msg.clientId, userName: msg.data?.userName });
+  const pollOnce = async () => {
+    if (closed || polling) return;
+    polling = true;
+    try {
+      if (roomId) {
+        const q = new URLSearchParams({ userId, since: roomSince });
+        const data = await getJSON(`/api/rooms/${roomId}/events?${q}`);
+        if (data?.events?.length) {
+          for (const ev of data.events) {
+            dispatch(ev.event, ev.payload);
+            if (ev.createdAt > roomSince) roomSince = ev.createdAt;
+          }
+        }
+        if (data?.serverTime && data.serverTime > roomSince) {
+          // keep since as last event time; serverTime alone shouldn't skip events
+        }
+      } else {
+        const q = new URLSearchParams({ userId, since: secretSince });
+        const data = await getJSON(`/api/secret/inbox?${q}`);
+        if (data?.events?.length) {
+          for (const ev of data.events) {
+            dispatch(ev.event, ev.payload);
+            if (ev.createdAt > secretSince) secretSince = ev.createdAt;
+          }
+        }
       }
-    });
-  }
-  secretChannel.subscribe("secret-matched", (msg) => dispatch("secret-matched", msg.data));
+    } catch (e) {
+      // transient — next tick retries
+    } finally {
+      polling = false;
+    }
+  };
 
-  ably.connection.on("connected", () => dispatch("connect"));
-  ably.connection.on("failed", () => dispatch("reconnect_failed"));
-  ably.connection.on("suspended", () => dispatch("reconnect_failed"));
+  const startPolling = () => {
+    if (pollTimer) return;
+    pollTimer = setInterval(pollOnce, POLL_MS);
+    pollOnce();
+  };
+
+  const startHeartbeat = () => {
+    if (heartbeatTimer || !roomId) return;
+    heartbeatTimer = setInterval(() => {
+      postJSON(`/api/rooms/${roomId}/presence`, {
+        userId,
+        userName,
+        connectionId,
+        heartbeat: true,
+      }).catch(() => {});
+    }, HEARTBEAT_MS);
+  };
 
   const enterPresenceAndHydrate = async () => {
-    await channel.presence.enter({ userId, userName });
+    const result = await postJSON(`/api/rooms/${roomId}/presence`, {
+      userId,
+      userName,
+      connectionId,
+    });
     hasEnteredPresence = true;
+    startHeartbeat();
 
-    const members = await channel.presence.get();
-    const seenIds = new Set();
-    const peers = [];
-    for (const m of members) {
-      if (m.clientId === userId) continue;
-      if (!clientConnCounts.get(m.clientId))
-        clientConnCounts.set(m.clientId, new Set());
-      clientConnCounts.get(m.clientId).add(m.connectionId);
-      if (seenIds.has(m.clientId)) continue;
-      seenIds.add(m.clientId);
-      peers.push({ socketId: m.clientId, userId: m.clientId, userName: m.data?.userName });
-    }
+    const members = result?.members || (await getJSON(`/api/rooms/${roomId}/presence`)) || [];
+    const peers = members
+      .filter((m) => m.userId !== userId)
+      .map((m) => ({
+        socketId: m.userId,
+        userId: m.userId,
+        userName: m.userName,
+      }));
     dispatch("existing-peers", peers);
 
     const room = await getJSON(`/api/rooms/${roomId}`);
     if (room?.host === userId) {
       dispatch("host-status-confirmed", { isHost: true });
-      const knocks = await getJSON(`/api/rooms/${roomId}/knocks?userId=${userId}`);
+      const knocks = await getJSON(
+        `/api/rooms/${roomId}/knocks?userId=${userId}`,
+      );
       (knocks || []).forEach((k) =>
-        dispatch("knock-request", { socketId: k.userId, userId: k.userId, userName: k.userName }),
+        dispatch("knock-request", {
+          socketId: k.userId,
+          userId: k.userId,
+          userName: k.userName,
+        }),
       );
     }
 
     const history = await getJSON(`/api/rooms/${roomId}/chat`);
     dispatch("chat-history", history || []);
+
+    // Skip historical join/leave fan-out already reflected in existing-peers
+    roomSince = new Date().toISOString();
   };
 
   async function restDispatch(event, data) {
@@ -336,7 +369,9 @@ export function createRealtimeClient({ roomId, userId, userName }) {
           breakoutRoomId: data.breakoutRoomId,
         }).catch(() => {});
       case "breakout-end":
-        return delJSON(`/api/rooms/${roomId}/breakout`, { userId }).catch(() => {});
+        return delJSON(`/api/rooms/${roomId}/breakout`, { userId }).catch(
+          () => {},
+        );
       case "breakout-broadcast":
         return postJSON(`/api/rooms/${roomId}/breakout/broadcast`, {
           userId,
@@ -353,6 +388,8 @@ export function createRealtimeClient({ roomId, userId, userName }) {
       }
 
       case "secret-join-queue": {
+        // Ensure inbox polling is running for the waiting partner path
+        startPolling();
         const result = await postJSON("/api/secret/join", {
           userId: data.userId || userId,
           userName: data.userName || userName,
@@ -369,7 +406,9 @@ export function createRealtimeClient({ roomId, userId, userName }) {
         return;
       }
       case "secret-leave-queue":
-        await postJSON("/api/secret/leave", { userId: data.userId || userId }).catch(() => {});
+        await postJSON("/api/secret/leave", {
+          userId: data.userId || userId,
+        }).catch(() => {});
         dispatch("secret-cancelled");
         return;
 
@@ -390,11 +429,11 @@ export function createRealtimeClient({ roomId, userId, userName }) {
     emit(event, data) {
       if (RELAY_RENAME[event]) {
         const [name, payload] = RELAY_RENAME[event](data || {}, userId);
-        channel.publish(name, payload).catch(() => {});
+        publishRoomEvent(name, payload);
         return;
       }
       if (DIRECT_BROADCAST.has(event)) {
-        channel.publish(event, data).catch(() => {});
+        publishRoomEvent(event, data || {});
         return;
       }
       restDispatch(event, data || {}).catch((e) =>
@@ -402,10 +441,29 @@ export function createRealtimeClient({ roomId, userId, userName }) {
       );
     },
     disconnect() {
-      if (hasEnteredPresence && channel) channel.presence.leave().catch(() => {});
-      ably.close();
+      closed = true;
+      if (pollTimer) clearInterval(pollTimer);
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      if (cursorTimer) clearTimeout(cursorTimer);
+      pollTimer = heartbeatTimer = cursorTimer = null;
+      if (hasEnteredPresence && roomId) {
+        delJSON(`/api/rooms/${roomId}/presence`, {
+          userId,
+          userName,
+          connectionId,
+        }).catch(() => {});
+      }
     },
   };
+
+  // Room clients poll immediately; SecretMeet (no roomId) starts on queue join
+  // but also poll inbox so a late subscribe still works if emit order varies.
+  queueMicrotask(() => {
+    if (closed) return;
+    dispatch("connect");
+    if (roomId) startPolling();
+    else startPolling();
+  });
 
   return socketLike;
 }
