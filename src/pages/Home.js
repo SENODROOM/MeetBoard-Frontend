@@ -124,6 +124,36 @@ export default function Home() {
     setSecretState('idle');
   };
 
+  const reportSecretPartner = async () => {
+    if (!secretPartner) return;
+    try {
+      await fetch(`${API}/api/secret/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          targetUserId: secretPartner,
+          reason: 'user-report',
+        }),
+      });
+    } catch { /* ignore */ }
+  };
+
+  const blockSecretPartner = async () => {
+    if (!secretPartner) return;
+    try {
+      await fetch(`${API}/api/secret/block`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          targetUserId: secretPartner,
+          reason: 'user-block',
+        }),
+      });
+    } catch { /* ignore */ }
+  };
+
   return (
     <div className={styles.page}>
       {/* Background */}
@@ -347,6 +377,9 @@ export default function Home() {
                 <button className={styles.secretBtn} onClick={joinSecretQueue} disabled={!userName.trim()}>
                   🎲 Find a random match
                 </button>
+                <p style={{marginTop:16,fontSize:12,opacity:.7,textAlign:'center'}}>
+                  Moderation: use Report / Block after a match if needed. SecretMeet stays with rate limits + blocks.
+                </p>
               </>)}
 
               {secretState === 'waiting' && (
@@ -368,6 +401,10 @@ export default function Home() {
                   <div className={styles.matchedIcon}>🎉</div>
                   <h3>Match found!</h3>
                   <p>You're being connected with <strong>{secretPartner}</strong></p>
+                  <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:12}}>
+                    <button type="button" className={styles.secretCancelBtn} onClick={reportSecretPartner}>Report</button>
+                    <button type="button" className={styles.secretCancelBtn} onClick={blockSecretPartner}>Block</button>
+                  </div>
                   <div className={styles.matchedBar}><div className={styles.matchedBarFill}/></div>
                   <p className={styles.matchedSub}>Joining room…</p>
                 </div>

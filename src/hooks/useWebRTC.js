@@ -406,12 +406,26 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
             clearTimeout(disconnectTimersRef.current[sid]);
             delete disconnectTimersRef.current[sid];
           }
+          setIsReconnecting(false);
+          try {
+            fetch(
+              `${process.env.REACT_APP_SERVER_URL || ""}/api/metrics/call-quality`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ event: "reconnect_ok" }),
+              },
+            );
+          } catch {
+            /* ignore */
+          }
           // Feature 9: start quality polling when connection is established
           startQualityPolling(pc, sid);
           return;
         }
 
         if (pc.connectionState === "disconnected") {
+          setIsReconnecting(true);
           if (disconnectTimersRef.current[sid]) return;
           try {
             pc.restartIce();
@@ -421,11 +435,25 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
             if (!current || current.connectionState !== "disconnected") return;
             console.warn(`[WebRTC] peer ${sid} did not recover, removing.`);
             removePeer(sid);
+            setIsReconnecting(false);
+            try {
+              fetch(
+                `${process.env.REACT_APP_SERVER_URL || ""}/api/metrics/call-quality`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ event: "reconnect_fail" }),
+                },
+              );
+            } catch {
+              /* ignore */
+            }
           }, 8000);
           return;
         }
 
         if (pc.connectionState === "failed") {
+          setIsReconnecting(true);
           try {
             pc.restartIce();
           } catch {}
@@ -433,8 +461,22 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
             disconnectTimersRef.current[`fail_${sid}`] = setTimeout(() => {
               delete disconnectTimersRef.current[`fail_${sid}`];
               const current = peersRef.current[sid];
-              if (current && current.connectionState === "failed")
+              if (current && current.connectionState === "failed") {
                 removePeer(sid);
+                setIsReconnecting(false);
+                try {
+                  fetch(
+                    `${process.env.REACT_APP_SERVER_URL || ""}/api/metrics/call-quality`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ event: "reconnect_fail" }),
+                    },
+                  );
+                } catch {
+                  /* ignore */
+                }
+              }
             }, 5000);
           }
           return;
