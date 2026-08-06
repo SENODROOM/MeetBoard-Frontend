@@ -905,8 +905,8 @@ export default function Room() {
         >
           <span style={{ flex: 1 }}>
             {isHost
-              ? `Mesh soft-cap (~${meshSoftCap} peers) reached — ask fewer people to enable video for better quality.`
-              : `Room is near mesh capacity (~${meshSoftCap}). Video may degrade.`}
+              ? `Mesh soft-cap (~${meshSoftCap} peers) reached — ask fewer people to enable video for better quality. Validated host guidance: prefer ≤${Math.max(2, meshSoftCap - 2)} cameras.`
+              : `Room is near mesh capacity (~${meshSoftCap}). Video may degrade — turn off camera if quality drops.`}
           </span>
           <button
             type="button"
