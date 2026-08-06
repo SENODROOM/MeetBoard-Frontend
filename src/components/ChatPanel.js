@@ -184,6 +184,7 @@ export default function ChatPanel({
           value={input}
           rows={1}
           aria-label="Message input"
+          data-testid="chat-input"
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -197,6 +198,7 @@ export default function ChatPanel({
           onClick={send}
           disabled={!input.trim()}
           aria-label="Send message"
+          data-testid="chat-send"
         >
           ➤
         </button>

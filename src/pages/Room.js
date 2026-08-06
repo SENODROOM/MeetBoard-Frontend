@@ -676,7 +676,7 @@ export default function Room() {
   if (knockStatus === "knocking")
     return (
       <div className={styles.waitScreen}>
-        <div className={styles.waitCard}>
+        <div className={styles.waitCard} data-testid="knock-waiting">
           <div className={styles.waitSpinner} />
           <h2>Waiting to be admitted</h2>
           <p>The host will let you in shortly.</p>

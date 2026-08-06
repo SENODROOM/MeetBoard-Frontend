@@ -812,7 +812,7 @@ function AnalyticsTab({classroomId,classroom,th,posts}){
   const gradeDistribution=[{label:'A (90-100)',color:'#10e88a'},{label:'B (80-89)',color:'#60a5fa'},{label:'C (70-79)',color:'var(--amber)'},{label:'D (60-69)',color:'#fb923c'},{label:'F (<60)',color:'var(--red)'}];
   const submissionRate=analytics?.submissionRate||0;const avgGrade=analytics?.averageGrade||0;const totalPosts=posts.length;
   return(
-    <div>
+    <div data-testid="analytics-root">
       <div className={styles.statsGrid}>
         <StatCard icon="👥" label="Students" value={students.length} color="#60a5fa"/>
         <StatCard icon="📋" label="Assignments" value={assignments.length} color={th.accent}/>

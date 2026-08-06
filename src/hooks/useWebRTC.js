@@ -4,6 +4,10 @@ import {
   buildRtcConfiguration,
   loadRtcConfiguration,
 } from "../lib/iceConfig";
+import {
+  probeMediaPermissions,
+  mediaModeFromPermissions,
+} from "../lib/mediaPermissions";
 
 export let MESH_SOFT_CAP = Number(process.env.REACT_APP_MESH_SOFT_CAP || 10);
 
@@ -215,16 +219,28 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
 
   // ── Init local stream ────────────────────────────────────────────────────────
   const initLocalStream = useCallback(async () => {
+    const perms = await probeMediaPermissions();
+    const mode = mediaModeFromPermissions(perms);
+    const wantVideo = mode !== "audio-only" && mode !== "view-only";
+    const wantAudio = mode !== "view-only";
+
+    if (!wantVideo && !wantAudio) {
+      console.info("[webrtc] view-only mode — no getUserMedia");
+      return null;
+    }
+
     try {
       const rawStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-          channelCount: 1,
-        },
+        video: wantVideo,
+        audio: wantAudio
+          ? {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 48000,
+              channelCount: 1,
+            }
+          : false,
       });
       const s = await buildEnhancedAudioStream(rawStream);
       localStreamRef.current = s;
