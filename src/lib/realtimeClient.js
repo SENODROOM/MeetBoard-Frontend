@@ -7,11 +7,15 @@ const API = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
 // socket-shaped API (`emit` / `on` / `off` / `id` / `disconnect`) so Room and
 // useWebRTC don't need to change. Peer addressing uses userId as socketId.
 
-const POLL_MS_IDLE = 2000;
-const POLL_MS_ACTIVE = 400;
-const POLL_MS_NEGOTIATING = 250;
-const HEARTBEAT_MS = 8_000;
-const LONG_POLL_WAIT_MS = 20000;
+const POLL_MS_IDLE = 3000;
+const POLL_MS_ACTIVE = 600;
+const POLL_MS_NEGOTIATING = 300;
+const HEARTBEAT_MS = 15_000;
+const LONG_POLL_WAIT_MS = 15000;
+const CURSOR_COALESCE_MS = 150;
+const ICE_COALESCE_MS = 100;
+const DRAW_COALESCE_MS = 50;
+const DRAW_BATCH_MAX = 40;
 
 const SIGNALING_EVENTS = new Set([
   "offer",
@@ -101,11 +105,22 @@ export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
   let heartbeatTimer = null;
   let cursorTimer = null;
   let pendingCursor = null;
+  let iceTimer = null;
+  let pendingIce = [];
+  let drawTimer = null;
+  let pendingDraws = [];
   let polling = false;
   let negotiatingUntil = 0;
   let lastActivity = Date.now();
   let useLongPoll = true;
   let token = roomToken || (roomId ? localStorage.getItem(`qm_room_token_${roomId}`) : null);
+  let tabVisible = typeof document === "undefined" || document.visibilityState !== "hidden";
+
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      tabVisible = document.visibilityState !== "hidden";
+    });
+  }
 
   const setRoomToken = (t) => {
     token = t;
@@ -122,6 +137,7 @@ export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
   };
 
   const currentPollMs = () => {
+    if (!tabVisible) return POLL_MS_IDLE * 2;
     if (Date.now() < negotiatingUntil) return POLL_MS_NEGOTIATING;
     if (Date.now() - lastActivity < 5000) return POLL_MS_ACTIVE;
     return POLL_MS_IDLE;
@@ -149,6 +165,46 @@ export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
     });
   };
 
+  const flushIce = () => {
+    iceTimer = null;
+    const batch = pendingIce;
+    pendingIce = [];
+    if (!batch.length) return;
+    // Send last candidate per peer target to cut bus chatter
+    const byTo = new Map();
+    for (const p of batch) {
+      const key = p?.to || "_";
+      byTo.set(key, p);
+    }
+    for (const p of byTo.values()) {
+      publishEvent("ice-candidate", p).catch(() => {});
+    }
+  };
+
+  const flushDraws = () => {
+    drawTimer = null;
+    const batch = pendingDraws;
+    pendingDraws = [];
+    if (!batch.length) return;
+    // One bus event for many stroke segments
+    const base = batch[0] || {};
+    publishEvent("wb-draw", {
+      roomId: base.roomId,
+      from: base.from,
+      segments: batch.map(
+        ({ x0, y0, x1, y1, color, size, tool }) => ({
+          x0,
+          y0,
+          x1,
+          y1,
+          color,
+          size,
+          tool,
+        }),
+      ),
+    }).catch(() => {});
+  };
+
   const publishRoomEvent = (event, payload) => {
     if (event === "wb-cursor") {
       pendingCursor = payload;
@@ -158,9 +214,32 @@ export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
           const p = pendingCursor;
           pendingCursor = null;
           if (p) publishEvent("wb-cursor", p).catch(() => {});
-        }, 80);
+        }, CURSOR_COALESCE_MS);
       }
       return;
+    }
+    if (event === "ice-candidate") {
+      pendingIce.push(payload || {});
+      if (!iceTimer) iceTimer = setTimeout(flushIce, ICE_COALESCE_MS);
+      return;
+    }
+    if (event === "wb-draw") {
+      pendingDraws.push(payload || {});
+      if (pendingDraws.length >= DRAW_BATCH_MAX) {
+        if (drawTimer) clearTimeout(drawTimer);
+        flushDraws();
+        return;
+      }
+      if (!drawTimer) drawTimer = setTimeout(flushDraws, DRAW_COALESCE_MS);
+      return;
+    }
+    // Skip empty canvas dumps
+    if (event === "wb-canvas-state" && payload?.json) {
+      try {
+        if (JSON.stringify(payload.json).length > 200_000) return;
+      } catch {
+        return;
+      }
     }
     publishEvent(event, payload).catch(() => {});
   };
@@ -171,7 +250,8 @@ export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
     try {
       if (roomId) {
         const q = new URLSearchParams({ userId, since: roomSince });
-        if (useLongPoll) q.set("wait", String(LONG_POLL_WAIT_MS));
+        // Long-poll only when tab visible — cuts idle serverless load
+        if (useLongPoll && tabVisible) q.set("wait", String(LONG_POLL_WAIT_MS));
         const data = await getJSON(`/api/rooms/${roomId}/events?${q}`);
         if (data?.events?.length) {
           for (const ev of data.events) {
@@ -198,7 +278,8 @@ export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
 
   const scheduleNextPoll = () => {
     if (closed) return;
-    const delay = useLongPoll && roomId ? 50 : currentPollMs();
+    const delay =
+      useLongPoll && roomId && tabVisible ? 80 : currentPollMs();
     pollTimer = setTimeout(async () => {
       await pollOnce();
       scheduleNextPoll();
@@ -212,14 +293,16 @@ export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
 
   const startHeartbeat = () => {
     if (heartbeatTimer || !roomId) return;
-    heartbeatTimer = setInterval(() => {
+    const beat = () => {
+      if (!tabVisible) return; // hidden tabs don't refresh presence (stale GC handles leave)
       postJSON(`/api/rooms/${roomId}/presence`, {
         userId,
         userName,
         connectionId,
         heartbeat: true,
       }).catch(() => {});
-    }, HEARTBEAT_MS);
+    };
+    heartbeatTimer = setInterval(beat, HEARTBEAT_MS);
   };
 
   const enterPresenceAndHydrate = async () => {
@@ -527,7 +610,13 @@ export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
       if (pollTimer) clearTimeout(pollTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (cursorTimer) clearTimeout(cursorTimer);
-      pollTimer = heartbeatTimer = cursorTimer = null;
+      if (iceTimer) clearTimeout(iceTimer);
+      if (drawTimer) {
+        clearTimeout(drawTimer);
+        flushDraws();
+      }
+      pollTimer = heartbeatTimer = cursorTimer = iceTimer = drawTimer = null;
+      pendingDraws = [];
       if (hasEnteredPresence && roomId) {
         delJSON(`/api/rooms/${roomId}/presence`, {
           userId,

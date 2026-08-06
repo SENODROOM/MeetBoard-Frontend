@@ -1,28 +1,13 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  buildRtcConfiguration,
+  loadRtcConfiguration,
+} from "../lib/iceConfig";
 
-const ICE = (() => {
-  const fallback = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-    ],
-    iceCandidatePoolSize: 10,
-  };
-  try {
-    const raw = process.env.REACT_APP_ICE_SERVERS;
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length) {
-      return { iceServers: parsed, iceCandidatePoolSize: 10 };
-    }
-  } catch (err) {
-    console.warn("[webrtc] Invalid REACT_APP_ICE_SERVERS, using STUN defaults", err);
-  }
-  return fallback;
-})();
-
-export const MESH_SOFT_CAP = Number(process.env.REACT_APP_MESH_SOFT_CAP || 10);
+export const MESH_SOFT_CAP = Number(
+  process.env.REACT_APP_MESH_SOFT_CAP || 10,
+);
 
 // ── Audio enhancement pipeline ───────────────────────────────────────────────
 async function buildEnhancedAudioStream(rawStream) {
@@ -90,6 +75,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   const [isReconnecting, setIsReconnecting] = useState(false);
   // Feature 9: per-peer connection quality — socketId → 'good'|'fair'|'poor'
   const [peerQuality, setPeerQuality] = useState({});
+  const iceConfigRef = useRef(buildRtcConfiguration());
 
   const socketRef = useRef(socket);
   const userNameRef = useRef(userName);
@@ -99,6 +85,15 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   useEffect(() => {
     userNameRef.current = userName;
   }, [userName]);
+  useEffect(() => {
+    let cancelled = false;
+    loadRtcConfiguration().then((cfg) => {
+      if (!cancelled) iceConfigRef.current = cfg;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ── Feature 9: Quality polling ───────────────────────────────────────────────
   const startQualityPolling = useCallback((pc, socketId) => {
@@ -259,7 +254,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
         delete peersRef.current[sid];
       }
 
-      const pc = new RTCPeerConnection(ICE);
+      const pc = new RTCPeerConnection(iceConfigRef.current);
 
       if (localStreamRef.current) {
         localStreamRef.current

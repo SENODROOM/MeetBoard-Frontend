@@ -128,9 +128,7 @@ export default function Whiteboard({
   useEffect(() => {
     if (!socket) return;
 
-    const onDraw = ({ x0, y0, x1, y1, color: c, size: s, tool: t }) => {
-      const ctx = getCtx();
-      if (!ctx) return;
+    const strokeSegment = (ctx, { x0, y0, x1, y1, color: c, size: s, tool: t }) => {
       ctx.save();
       ctx.strokeStyle = t === "eraser" ? "#0c1220" : c;
       ctx.lineWidth = s;
@@ -143,6 +141,16 @@ export default function Whiteboard({
       ctx.lineTo(x1, y1);
       ctx.stroke();
       ctx.restore();
+    };
+
+    const onDraw = (payload) => {
+      const ctx = getCtx();
+      if (!ctx) return;
+      if (Array.isArray(payload?.segments)) {
+        for (const seg of payload.segments) strokeSegment(ctx, seg);
+        return;
+      }
+      strokeSegment(ctx, payload);
     };
 
     const onClear = () => {
