@@ -27,6 +27,11 @@ export default function BreakoutPanel({
   // and will freeze WebRTC/Socket.IO heartbeats during a live call.
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
+  const [hostChecklist, setHostChecklist] = useState({
+    named: false,
+    assigned: false,
+    timer: false,
+  });
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -158,6 +163,11 @@ export default function BreakoutPanel({
     });
 
     setActive(true);
+    setHostChecklist({
+      named: rooms.every((r) => r.name && r.name.trim()),
+      assigned: rooms.some((r) => r.participants.length > 0),
+      timer: !!timer,
+    });
     if (timer) setCountdown(timer * 60);
   };
 
@@ -254,6 +264,32 @@ export default function BreakoutPanel({
       </div>
 
       {toast && <div className={styles.toastBanner}>{toast}</div>}
+
+      {isHost && (
+        <div
+          style={{
+            fontSize: 12,
+            padding: "8px 12px",
+            opacity: 0.85,
+            borderBottom: "1px solid rgba(255,255,255,.06)",
+          }}
+        >
+          Host checklist:{" "}
+          <span style={{ color: hostChecklist.named ? "#34d399" : "#94a3b8" }}>
+            {hostChecklist.named ? "✓" : "○"} named
+          </span>
+          {" · "}
+          <span
+            style={{ color: hostChecklist.assigned ? "#34d399" : "#94a3b8" }}
+          >
+            {hostChecklist.assigned ? "✓" : "○"} assigned
+          </span>
+          {" · "}
+          <span style={{ color: hostChecklist.timer ? "#34d399" : "#94a3b8" }}>
+            {hostChecklist.timer ? "✓" : "○"} timer
+          </span>
+        </div>
+      )}
 
       {!active ? (
         <div className={styles.body}>

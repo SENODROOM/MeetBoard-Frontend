@@ -5,4 +5,9 @@ test.describe("QuantumMeet smoke", () => {
     await page.goto("/");
     await expect(page.locator("body")).toBeVisible();
   });
+
+  test("home shows product chrome", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("body")).toContainText(/Quantum|Meet|Join|Create/i);
+  });
 });

@@ -409,7 +409,13 @@ export default function Room() {
 
   // ── Meeting recorder ──────────────────────────────────────────────────────────
   const { recording, duration, startRecording, stopRecording } =
-    useMeetingRecorder({ localStream, peers });
+    useMeetingRecorder({
+      localStream,
+      peers,
+      roomId,
+      classroomId,
+      userId,
+    });
   const handleRecord = useCallback(() => {
     if (recording) stopRecording();
     else startRecording();
@@ -694,9 +700,20 @@ export default function Room() {
           <span style={{ fontSize: 48 }}>🚫</span>
           <h2>Entry denied</h2>
           <p>The host declined your request.</p>
-          <button className={styles.waitLeave} onClick={() => navigate("/")}>
-            Go back
-          </button>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <button
+              className={styles.waitJoinBtn}
+              onClick={() => {
+                setKnockStatus("knocking");
+                socketRef.current?.emit("knock", { roomId, userId, userName });
+              }}
+            >
+              Knock again
+            </button>
+            <button className={styles.waitLeave} onClick={() => navigate("/")}>
+              Go back
+            </button>
+          </div>
         </div>
       </div>
     );

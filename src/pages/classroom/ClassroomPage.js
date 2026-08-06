@@ -874,6 +874,20 @@ function AttendanceTab({classroomId,classroom,sessions,th,showToast}){
   const markAll=(status)=>{setRecords(students.map(s=>({studentId:s.userId,studentName:s.userName,status})));};
   const mark=(studentId,studentName,status)=>{setRecords(p=>{const idx=p.findIndex(r=>r.studentId===studentId);if(idx>=0){const n=[...p];n[idx]={...n[idx],status};return n;}return[...p,{studentId,studentName,status}];});};
   const save=async()=>{setSaving(true);try{await fetch(`${API}/api/classrooms/${classroomId}/attendance`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:selected,records})});showToast('Attendance saved!');}catch{}finally{setSaving(false);};};
+  const fromPresence=async()=>{
+    if(!selected) return;
+    const sess=sessions.find(s=>s._id===selected);
+    if(!sess?.roomId){showToast('Session has no room');return;}
+    setLoading(true);
+    try{
+      const r=await fetch(`${API}/api/classrooms/${classroomId}/attendance/from-presence`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:selected,roomId:sess.roomId})});
+      const d=await r.json();
+      if(Array.isArray(d?.records)) setRecords(d.records);
+      else if(Array.isArray(d)) setRecords(d);
+      showToast('Marked from live presence');
+    }catch{showToast('Could not load presence');}
+    finally{setLoading(false);}
+  };
   const present=records.filter(r=>r.status==='present').length;const absent=records.filter(r=>r.status==='absent').length;const late=records.filter(r=>r.status==='late').length;
   return(
     <div>
@@ -883,6 +897,7 @@ function AttendanceTab({classroomId,classroom,sessions,th,showToast}){
         </select>
         {records.length>0&&<div className={styles.attendanceSummary}><span style={{color:'#10e88a'}}>✓ {present}</span><span style={{color:'var(--red)'}}>✕ {absent}</span><span style={{color:'var(--amber)'}}>⏱ {late}</span></div>}
         <button className={styles.btnGhost} onClick={()=>markAll('present')}>All Present</button>
+        <button className={styles.btnGhost} onClick={fromPresence} disabled={!selected||loading}>From live presence</button>
         <button className={styles.btnDanger} onClick={()=>markAll('absent')}>All Absent</button>
         <button className={styles.submitBtn} style={{background:th.accent,color:'#000',marginLeft:'auto'}} onClick={save} disabled={saving}>{saving?'Saving…':'Save Attendance'}</button>
       </div>
@@ -913,6 +928,7 @@ function AttendanceTab({classroomId,classroom,sessions,th,showToast}){
 function MaterialsTab({classroomId,posts,setPosts,isTeacher,userId,userName,th,fetchPosts,showToast}){
   const[creating,setCreating]=useState(false);const[form,setForm]=useState({title:'',body:'',topic:''});const[files,setFiles]=useState([]);const[posting,setPosting]=useState(false);
   const materials=posts.filter(p=>p.type==='material');
+  const topics=[...new Set(materials.map(m=>m.topic||'General'))];
   const handleCreate=async()=>{if(!form.title.trim()) return;setPosting(true);try{const attachments=await uploadFilesToBlob(classroomId,files);const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...form,type:'material',authorId:userId,authorName:userName,attachments})});const d=await r.json();setPosts(p=>[d,...p]);setCreating(false);setForm({title:'',body:'',topic:''});setFiles([]);showToast('Material posted!');}catch{}finally{setPosting(false);};};
   const handleDelete=async(postId)=>{if(!window.confirm('Delete?')) return;await fetch(`${API}/api/classrooms/${classroomId}/posts/${postId}`,{method:'DELETE'});setPosts(p=>p.filter(x=>x.postId!==postId));showToast('Deleted');};
   return(
@@ -932,21 +948,30 @@ function MaterialsTab({classroomId,posts,setPosts,isTeacher,userId,userName,th,f
         </div>
       )}
       {materials.length===0&&!creating&&<div className={styles.emptyState}><span>📚</span><strong>No materials yet</strong><p>{isTeacher?'Post study materials for your students.':'Your teacher hasn\'t posted any materials yet.'}</p></div>}
-      <div className={styles.materialsGrid}>
-        {materials.map(m=>(
-          <div key={m.postId} className={styles.materialCard} style={{borderColor:th.border}}>
-            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
-              <div className={styles.materialIcon}>{m.attachments?.length?fileIcon(m.attachments[0]?.mime):'📄'}</div>
-              {isTeacher&&<button className={styles.deleteIconBtn} onClick={()=>handleDelete(m.postId)}>🗑</button>}
+      {topics.map(topic=>{
+        const items=materials.filter(m=>(m.topic||'General')===topic);
+        if(!items.length) return null;
+        return(
+          <div key={topic} className={styles.topicGroup}>
+            {topics.length>1&&<div className={styles.topicGroupLabel}><span>📁</span>{topic}</div>}
+            <div className={styles.materialsGrid}>
+              {items.map(m=>(
+                <div key={m.postId} className={styles.materialCard} style={{borderColor:th.border}}>
+                  <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
+                    <div className={styles.materialIcon}>{m.attachments?.length?fileIcon(m.attachments[0]?.mime):'📄'}</div>
+                    {isTeacher&&<button className={styles.deleteIconBtn} onClick={()=>handleDelete(m.postId)}>🗑</button>}
+                  </div>
+                  <div className={styles.materialTitle}>{m.title}</div>
+                  {m.topic&&<span className={styles.topicChip}>{m.topic}</span>}
+                  {m.body&&<div className={styles.materialMeta}>{m.body.slice(0,100)}</div>}
+                  {m.attachments?.length>0&&<div className={styles.fileList}>{m.attachments.map((f,i)=><FileCard key={i} file={f} classroomId={classroomId}/>)}</div>}
+                  <div className={styles.materialMeta}>{fmtRel(m.createdAt)} · {m.authorName}</div>
+                </div>
+              ))}
             </div>
-            <div className={styles.materialTitle}>{m.title}</div>
-            {m.topic&&<span className={styles.topicChip}>{m.topic}</span>}
-            {m.body&&<div className={styles.materialMeta}>{m.body.slice(0,100)}</div>}
-            {m.attachments?.length>0&&<div className={styles.fileList}>{m.attachments.map((f,i)=><FileCard key={i} file={f} classroomId={classroomId}/>)}</div>}
-            <div className={styles.materialMeta}>{fmtRel(m.createdAt)} · {m.authorName}</div>
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
@@ -1023,9 +1048,12 @@ function QuizTake({quiz,classroomId,userId,userName,th,onBack,showToast}){
   const handleSubmit=async()=>{
     setSubmitting(true);
     const ansArr=qs.map((_,i)=>answers[i]??-1);
-    let sc=0;qs.forEach((q,i)=>{if(answers[i]===q.correct) sc+=(q.points||1);});
-    await fetch(`${API}/api/classrooms/${classroomId}/posts/${quiz.postId}/submissions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:userId,studentName:userName,quizAnswers:ansArr,quizScore:sc,grade:Math.round((sc/total)*100)})});
-    setScore(sc);setSubmitted(true);setSubmitting(false);showToast(`Quiz submitted! Score: ${sc}/${total}`);
+    try{
+      const r=await fetch(`${API}/api/classrooms/${classroomId}/posts/${quiz.postId}/submissions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quizAnswers:ansArr})});
+      const d=await r.json();
+      const sc=d.quizScore!=null?d.quizScore:qs.reduce((a,q,i)=>a+(answers[i]===q.correct?(q.points||1):0),0);
+      setScore(sc);setSubmitted(true);showToast(`Quiz submitted! Score: ${sc}/${total}`);
+    }catch{showToast('Submit failed');}finally{setSubmitting(false);}
   };
   if(submitted&&score!==null){
     const p=Math.round((score/total)*100);const c=gradeColor(p);

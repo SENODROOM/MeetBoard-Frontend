@@ -5,9 +5,23 @@ import {
   loadRtcConfiguration,
 } from "../lib/iceConfig";
 
-export const MESH_SOFT_CAP = Number(
-  process.env.REACT_APP_MESH_SOFT_CAP || 10,
-);
+export let MESH_SOFT_CAP = Number(process.env.REACT_APP_MESH_SOFT_CAP || 10);
+
+/** Prefer server `/api/growth/features` meshSoftCap when available. */
+export async function refreshMeshSoftCap() {
+  try {
+    const API = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
+    const res = await fetch(`${API}/api/growth/features`);
+    if (!res.ok) return MESH_SOFT_CAP;
+    const data = await res.json();
+    if (Number.isFinite(Number(data.meshSoftCap))) {
+      MESH_SOFT_CAP = Number(data.meshSoftCap);
+    }
+  } catch {
+    /* keep env default */
+  }
+  return MESH_SOFT_CAP;
+}
 
 // ── Audio enhancement pipeline ───────────────────────────────────────────────
 async function buildEnhancedAudioStream(rawStream) {
@@ -75,6 +89,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   const [isReconnecting, setIsReconnecting] = useState(false);
   // Feature 9: per-peer connection quality — socketId → 'good'|'fair'|'poor'
   const [peerQuality, setPeerQuality] = useState({});
+  const [meshSoftCap, setMeshSoftCap] = useState(MESH_SOFT_CAP);
   const iceConfigRef = useRef(buildRtcConfiguration());
 
   const socketRef = useRef(socket);
@@ -89,6 +104,9 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     let cancelled = false;
     loadRtcConfiguration().then((cfg) => {
       if (!cancelled) iceConfigRef.current = cfg;
+    });
+    refreshMeshSoftCap().then((cap) => {
+      if (!cancelled) setMeshSoftCap(cap);
     });
     return () => {
       cancelled = true;
@@ -678,8 +696,8 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     screenStream,
     peers,
     peerQuality, // Feature 9: exposed so Room.js can pass quality to VideoTile
-    meshCapExceeded: peers.length >= MESH_SOFT_CAP,
-    meshSoftCap: MESH_SOFT_CAP,
+    meshCapExceeded: peers.length >= meshSoftCap,
+    meshSoftCap,
     audioEnabled,
     videoEnabled,
     screenSharing,

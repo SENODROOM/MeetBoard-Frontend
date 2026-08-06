@@ -1,31 +1,34 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /**
- * useMeetingRecorder — records the entire meeting (all video + all audio) for admins.
- * 
- * Strategy (100% free, no server):
- *  1. Create an OffscreenCanvas that composites all video streams in a grid.
- *  2. Create a WebAudio context that mixes all audio streams (local + all peers).
- *  3. Feed canvas stream + mixed audio into MediaRecorder → WebM download.
- *
- * Result: single .webm file with all participants visible + all voices audible.
+ * useMeetingRecorder — composites local+peer A/V into a WebM.
+ * Downloads locally; when classroomId is set, also uploads to Blob + logs metadata.
  */
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from "react";
+import { upload as blobUpload } from "@vercel/blob/client";
 
-export function useMeetingRecorder({ localStream, peers }) {
+const API = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
+
+export function useMeetingRecorder({
+  localStream,
+  peers,
+  roomId,
+  classroomId,
+  userId,
+}) {
   const [recording, setRecording] = useState(false);
-  const [duration, setDuration]   = useState(0);
-  const recRef      = useRef(null);
-  const chunks      = useRef([]);
-  const canvasRef   = useRef(null);
-  const ctxRef      = useRef(null);
+  const [duration, setDuration] = useState(0);
+  const recRef = useRef(null);
+  const chunks = useRef([]);
+  const canvasRef = useRef(null);
+  const ctxRef = useRef(null);
   const audioCtxRef = useRef(null);
-  const destRef     = useRef(null);
-  const animRef     = useRef(null);
-  const timerRef    = useRef(null);
-  const startedAt   = useRef(0);
+  const destRef = useRef(null);
+  const animRef = useRef(null);
+  const timerRef = useRef(null);
+  const startedAt = useRef(0);
 
   const stopRecording = useCallback(() => {
-    if (recRef.current && recRef.current.state !== 'inactive') {
+    if (recRef.current && recRef.current.state !== "inactive") {
       recRef.current.stop();
     }
     cancelAnimationFrame(animRef.current);
@@ -38,136 +41,162 @@ export function useMeetingRecorder({ localStream, peers }) {
   const startRecording = useCallback(async () => {
     if (recording) return stopRecording();
 
-    // ── Canvas setup ─────────────────────────────────────────────────────────
-    const W = 1280, H = 720;
-    const canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
+    const W = 1280,
+      H = 720;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
     canvasRef.current = canvas;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     ctxRef.current = ctx;
 
-    // ── Audio mix setup ──────────────────────────────────────────────────────
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     audioCtxRef.current = audioCtx;
     const dest = audioCtx.createMediaStreamDestination();
     destRef.current = dest;
 
-    // Mix all audio sources
-    const allStreams = [localStream, ...peers.map(p => p.stream)].filter(Boolean);
-    allStreams.forEach(stream => {
+    const allStreams = [localStream, ...peers.map((p) => p.stream)].filter(
+      Boolean,
+    );
+    allStreams.forEach((stream) => {
       try {
         const src = audioCtx.createMediaStreamSource(stream);
         src.connect(dest);
-      } catch {}
+      } catch {
+        /* ignore */
+      }
     });
 
-    // ── Build video elements for each participant ─────────────────────────────
     const allParticipants = [
-      { stream: localStream, label: 'You', mirror: true },
-      ...peers.map(p => ({ stream: p.stream, label: p.userName, mirror: false })),
-    ].filter(p => p.stream);
+      { stream: localStream, label: "You", mirror: true },
+      ...peers.map((p) => ({
+        stream: p.stream,
+        label: p.userName,
+        mirror: false,
+      })),
+    ].filter((p) => p.stream);
 
     const videos = allParticipants.map(({ stream, label, mirror }) => {
-      const v = document.createElement('video');
+      const v = document.createElement("video");
       v.srcObject = stream;
-      v.autoplay  = true;
-      v.muted     = true; // prevent double audio
+      v.autoplay = true;
+      v.muted = true;
       v.playsInline = true;
       v.play().catch(() => {});
       return { el: v, label, mirror };
     });
 
-    // ── Draw loop ─────────────────────────────────────────────────────────────
     const drawGrid = () => {
-      const n = videos.length;
-      if (n === 0) { ctx.fillStyle = '#050810'; ctx.fillRect(0,0,W,H); return; }
-
-      const cols = n <= 1 ? 1 : n <= 4 ? 2 : 3;
+      const n = videos.length || 1;
+      const cols = Math.ceil(Math.sqrt(n));
       const rows = Math.ceil(n / cols);
-      const cellW = W / cols;
-      const cellH = H / rows;
-
-      ctx.fillStyle = '#050810';
+      const tw = W / cols;
+      const th = H / rows;
+      ctx.fillStyle = "#0c1220";
       ctx.fillRect(0, 0, W, H);
-
       videos.forEach(({ el, label, mirror }, i) => {
-        const col  = i % cols;
-        const row  = Math.floor(i / cols);
-        const x    = col * cellW;
-        const y    = row * cellH;
-        const pad  = 6;
-
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = col * tw;
+        const y = row * th;
         ctx.save();
         if (mirror) {
-          ctx.translate(x + cellW, y);
+          ctx.translate(x + tw, y);
           ctx.scale(-1, 1);
-          ctx.drawImage(el, pad, pad, cellW - pad*2, cellH - pad*2);
+          try {
+            ctx.drawImage(el, 0, 0, tw, th);
+          } catch {
+            /* ignore */
+          }
         } else {
-          ctx.drawImage(el, x + pad, y + pad, cellW - pad*2, cellH - pad*2);
+          try {
+            ctx.drawImage(el, x, y, tw, th);
+          } catch {
+            /* ignore */
+          }
         }
         ctx.restore();
-
-        // Name tag
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        ctx.fillRect(x + pad + 8, y + cellH - pad - 28, label.length * 8 + 16, 24);
-        ctx.fillStyle = '#e2e8f0';
-        ctx.font = 'bold 13px monospace';
-        ctx.fillText(label, x + pad + 16, y + cellH - pad - 10);
-
-        // Border
-        ctx.strokeStyle = 'rgba(0,212,255,0.25)';
-        ctx.lineWidth   = 2;
-        ctx.strokeRect(x + pad, y + pad, cellW - pad*2, cellH - pad*2);
+        ctx.fillStyle = "rgba(0,0,0,.55)";
+        ctx.fillRect(x, y + th - 28, tw, 28);
+        ctx.fillStyle = "#fff";
+        ctx.font = "14px sans-serif";
+        ctx.fillText(label || "Peer", x + 8, y + th - 10);
       });
-
-      // Timestamp overlay
-      const elapsed = Math.floor((Date.now() - startedAt.current) / 1000);
-      const mm = String(Math.floor(elapsed/60)).padStart(2,'0');
-      const ss = String(elapsed % 60).padStart(2,'0');
-      ctx.fillStyle = 'rgba(239,68,68,0.85)';
-      ctx.fillRect(W - 90, 12, 78, 26);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 13px monospace';
-      ctx.fillText(`⏺ ${mm}:${ss}`, W - 82, 30);
-
       animRef.current = requestAnimationFrame(drawGrid);
     };
 
-    // ── MediaRecorder ─────────────────────────────────────────────────────────
     const canvasStream = canvas.captureStream(30);
-    const audioTrack   = dest.stream.getAudioTracks()[0];
-    if (audioTrack) canvasStream.addTrack(audioTrack);
+    dest.stream.getAudioTracks().forEach((t) => canvasStream.addTrack(t));
 
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-      ? 'video/webm;codecs=vp9,opus'
-      : 'video/webm';
+    const mimeType = MediaRecorder.isTypeSupported(
+      "video/webm;codecs=vp9,opus",
+    )
+      ? "video/webm;codecs=vp9,opus"
+      : "video/webm";
 
     let rec;
     try {
-      rec = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 4_000_000 });
+      rec = new MediaRecorder(canvasStream, {
+        mimeType,
+        videoBitsPerSecond: 4_000_000,
+      });
     } catch {
       rec = new MediaRecorder(canvasStream);
     }
 
     chunks.current = [];
-    rec.ondataavailable = e => { if (e.data.size > 0) chunks.current.push(e.data); };
-    rec.onstop = () => {
-      const blob = new Blob(chunks.current, { type: 'video/webm' });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = `QuantumMeet-Recording-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.webm`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    rec.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.current.push(e.data);
+    };
+    rec.onstop = async () => {
+      const blob = new Blob(chunks.current, { type: "video/webm" });
+      const filename = `QuantumMeet-Recording-${new Date()
+        .toISOString()
+        .slice(0, 19)
+        .replace(/:/g, "-")}.webm`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      // Cleanup video elements
-      videos.forEach(({ el }) => { el.srcObject = null; });
+
+      const durationSec = Math.floor(
+        (Date.now() - startedAt.current) / 1000,
+      );
+      if (classroomId && roomId) {
+        try {
+          const file = new File([blob], filename, { type: "video/webm" });
+          const uploaded = await blobUpload(filename, file, {
+            access: "public",
+            handleUploadUrl: `${API}/api/classrooms/${classroomId}/blob-upload`,
+          });
+          await fetch(`${API}/api/rooms/${roomId}/recordings`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,
+              blobUrl: uploaded.url,
+              durationSec,
+              classroomId,
+            }),
+          });
+        } catch (err) {
+          console.warn("[recorder] upload failed", err);
+        }
+      }
+
+      videos.forEach(({ el }) => {
+        el.srcObject = null;
+      });
     };
 
     rec.start(1000);
     recRef.current = rec;
     startedAt.current = Date.now();
 
-    // Duration counter
     timerRef.current = setInterval(() => {
       setDuration(Math.floor((Date.now() - startedAt.current) / 1000));
     }, 1000);
@@ -175,7 +204,15 @@ export function useMeetingRecorder({ localStream, peers }) {
     drawGrid();
     setRecording(true);
     setDuration(0);
-  }, [recording, localStream, peers, stopRecording]);
+  }, [
+    recording,
+    localStream,
+    peers,
+    stopRecording,
+    classroomId,
+    roomId,
+    userId,
+  ]);
 
   return { recording, duration, startRecording, stopRecording };
 }
