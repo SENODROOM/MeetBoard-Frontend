@@ -382,8 +382,6 @@ export default function Room() {
     peerQuality, // Feature 9
     meshCapExceeded,
     meshSoftCap,
-    sfuRecommended,
-    sfuThreshold,
     audioEnabled,
     videoEnabled,
     screenSharing,
@@ -883,7 +881,7 @@ export default function Room() {
         </div>
       )}
 
-      { (meshCapExceeded || sfuRecommended) && !meshCapDismissed && (
+      {meshCapExceeded && !meshCapDismissed && (
         <div
           style={{
             position: "absolute",
@@ -906,11 +904,9 @@ export default function Room() {
           role="status"
         >
           <span style={{ flex: 1 }}>
-            {sfuRecommended
-              ? `Room size ≥ SFU threshold (~${sfuThreshold}). SFU flag is on — media SFU path pending vendor (mesh still active).`
-              : isHost
-                ? `Mesh soft-cap (~${meshSoftCap} peers) reached — ask fewer people to enable video, or wait for SFU.`
-                : `Room is near mesh capacity (~${meshSoftCap}). Video may degrade.`}
+            {isHost
+              ? `Mesh soft-cap (~${meshSoftCap} peers) reached — ask fewer people to enable video for better quality.`
+              : `Room is near mesh capacity (~${meshSoftCap}). Video may degrade.`}
           </span>
           <button
             type="button"

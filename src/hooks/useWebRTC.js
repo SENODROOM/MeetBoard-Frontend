@@ -8,6 +8,7 @@ import {
   probeMediaPermissions,
   mediaModeFromPermissions,
 } from "../lib/mediaPermissions";
+import { addSimulcastVideoTrack, setSenderBandwidthTier } from "../lib/simulcast";
 
 export let MESH_SOFT_CAP = Number(process.env.REACT_APP_MESH_SOFT_CAP || 10);
 
@@ -21,13 +22,9 @@ export async function refreshMeshSoftCap() {
     if (Number.isFinite(Number(data.meshSoftCap))) {
       MESH_SOFT_CAP = Number(data.meshSoftCap);
     }
-    return {
-      meshSoftCap: MESH_SOFT_CAP,
-      sfuEnabled: !!data.sfuEnabled,
-      sfuThreshold: Number(data.sfuThreshold) || 12,
-    };
+    return { meshSoftCap: MESH_SOFT_CAP };
   } catch {
-    return { meshSoftCap: MESH_SOFT_CAP, sfuEnabled: false, sfuThreshold: 12 };
+    return { meshSoftCap: MESH_SOFT_CAP };
   }
 }
 
@@ -98,8 +95,6 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   // Feature 9: per-peer connection quality — socketId → 'good'|'fair'|'poor'
   const [peerQuality, setPeerQuality] = useState({});
   const [meshSoftCap, setMeshSoftCap] = useState(MESH_SOFT_CAP);
-  const [sfuEnabled, setSfuEnabled] = useState(false);
-  const [sfuThreshold, setSfuThreshold] = useState(12);
   const iceConfigRef = useRef(buildRtcConfiguration());
 
   const socketRef = useRef(socket);
@@ -116,10 +111,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       if (!cancelled) iceConfigRef.current = cfg;
     });
     refreshMeshSoftCap().then((feats) => {
-      if (cancelled) return;
-      setMeshSoftCap(feats.meshSoftCap);
-      setSfuEnabled(!!feats.sfuEnabled);
-      setSfuThreshold(feats.sfuThreshold || 12);
+      if (!cancelled) setMeshSoftCap(feats.meshSoftCap);
     });
     return () => {
       cancelled = true;
@@ -323,9 +315,21 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       const pc = new RTCPeerConnection(iceConfigRef.current);
 
       if (localStreamRef.current) {
-        localStreamRef.current
-          .getTracks()
-          .forEach((t) => pc.addTrack(t, localStreamRef.current));
+        for (const t of localStreamRef.current.getTracks()) {
+          if (t.kind === "video") {
+            addSimulcastVideoTrack(pc, t);
+          } else {
+            pc.addTrack(t, localStreamRef.current);
+          }
+        }
+        // Soft bandwidth adapt when many peers (E-503)
+        const tier =
+          peersRef.current && Object.keys(peersRef.current).length >= 6
+            ? "medium"
+            : "high";
+        pc.getSenders().forEach((s) => {
+          if (s.track?.kind === "video") setSenderBandwidthTier(s, tier);
+        });
       }
       if (screenStreamRef.current) {
         const screenTrack = screenStreamRef.current.getVideoTracks()[0];
@@ -723,9 +727,6 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
     peerQuality, // Feature 9: exposed so Room.js can pass quality to VideoTile
     meshCapExceeded: peers.length >= meshSoftCap,
     meshSoftCap,
-    sfuEnabled,
-    sfuThreshold,
-    sfuRecommended: sfuEnabled && peers.length >= sfuThreshold,
     audioEnabled,
     videoEnabled,
     screenSharing,
