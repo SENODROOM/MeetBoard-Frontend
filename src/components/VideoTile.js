@@ -12,7 +12,7 @@ export default function VideoTile({
   onPin,
   isHost,
   onKick,
-  quality = null, // 'good' | 'fair' | 'poor' | null — Feature 9
+  quality = null, // 'good'|'fair'|'poor' | { level, lossPct, kbps } | null
 }) {
   const videoRef = useRef(null);
   const analyserRef = useRef(null);
@@ -94,11 +94,23 @@ export default function VideoTile({
   };
 
   // Quality indicator config
+  const qualityLevel =
+    quality && typeof quality === "object" ? quality.level : quality;
+  const qualityDetail =
+    quality && typeof quality === "object"
+      ? `${quality.lossPct ?? 0}% loss · ~${quality.kbps ?? 0} kbps`
+      : null;
   const qualityConfig = {
     good: { color: "#34d399", bars: 3, label: "Good connection" },
     fair: { color: "#fbbf24", bars: 2, label: "Fair connection" },
     poor: { color: "#f87171", bars: 1, label: "Poor connection" },
   };
+  const qCfg = qualityLevel ? qualityConfig[qualityLevel] : null;
+  const qualityTitle = qCfg
+    ? qualityDetail
+      ? `${qCfg.label} (${qualityDetail})`
+      : qCfg.label
+    : "";
 
   return (
     <div
@@ -142,11 +154,11 @@ export default function VideoTile({
       {isPinned && <div className={styles.pinBadge}>📌</div>}
 
       {/* Feature 9: Connection quality signal bars — remote non-screen peers only */}
-      {quality && !isLocal && !isScreen && qualityConfig[quality] && (
+      {qCfg && !isLocal && !isScreen && (
         <div
           className={styles.qualityIndicator}
-          title={qualityConfig[quality].label}
-          aria-label={qualityConfig[quality].label}
+          title={qualityTitle}
+          aria-label={qualityTitle}
         >
           {[1, 2, 3].map((bar) => (
             <div
@@ -155,8 +167,8 @@ export default function VideoTile({
               style={{
                 height: bar * 4 + 2,
                 background:
-                  bar <= qualityConfig[quality].bars
-                    ? qualityConfig[quality].color
+                  bar <= qCfg.bars
+                    ? qCfg.color
                     : "rgba(255,255,255,0.15)",
               }}
             />

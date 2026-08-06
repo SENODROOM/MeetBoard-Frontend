@@ -113,11 +113,13 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
       try {
         const stats = await pc.getStats();
         let packetsLost = 0,
-          packetsReceived = 0;
+          packetsReceived = 0,
+          bytesReceived = 0;
         stats.forEach((report) => {
           if (report.type === "inbound-rtp" && report.kind === "video") {
             packetsLost += report.packetsLost || 0;
             packetsReceived += report.packetsReceived || 0;
+            bytesReceived += report.bytesReceived || 0;
           }
         });
         const lossRate =
@@ -126,7 +128,27 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
             : 0;
         const quality =
           lossRate < 0.02 ? "good" : lossRate < 0.08 ? "fair" : "poor";
-        setPeerQuality((q) => ({ ...q, [socketId]: quality }));
+        const prev = qualityIntervalsRef.current[`_bytes_${socketId}`] || {
+          bytes: bytesReceived,
+          t: Date.now(),
+        };
+        const dt = Math.max(1, Date.now() - prev.t) / 1000;
+        const kbps = Math.max(
+          0,
+          Math.round(((bytesReceived - prev.bytes) * 8) / 1000 / dt),
+        );
+        qualityIntervalsRef.current[`_bytes_${socketId}`] = {
+          bytes: bytesReceived,
+          t: Date.now(),
+        };
+        setPeerQuality((q) => ({
+          ...q,
+          [socketId]: {
+            level: quality,
+            lossPct: Math.round(lossRate * 1000) / 10,
+            kbps,
+          },
+        }));
       } catch {
         // Connection may have closed between ticks
       }
@@ -137,6 +159,7 @@ export const useWebRTC = ({ socket, roomId, userId, userName }) => {
   const stopQualityPolling = useCallback((socketId) => {
     clearInterval(qualityIntervalsRef.current[socketId]);
     delete qualityIntervalsRef.current[socketId];
+    delete qualityIntervalsRef.current[`_bytes_${socketId}`];
     setPeerQuality((q) => {
       const next = { ...q };
       delete next[socketId];

@@ -39,6 +39,7 @@ export default function Room() {
     }
     return id;
   });
+  const [meshCapDismissed, setMeshCapDismissed] = useState(false);
   const [isHost, setIsHost] = useState(
     () => !!localStorage.getItem(`qm_host_${roomId}`),
   );
@@ -240,6 +241,12 @@ export default function Room() {
     s.on("knock-rejected", () => {
       setKnockStatus("rejected");
       playKnock();
+    });
+    s.on("knock-cancelled", ({ socketId, userId: uid }) => {
+      const id = socketId || uid;
+      setKnockRequests((prev) =>
+        prev.filter((k) => k.socketId !== id && k.userId !== id),
+      );
     });
 
     s.on("force-mute", () => window.dispatchEvent(new Event("qm-force-mute")));
@@ -666,7 +673,14 @@ export default function Room() {
           <h2>Waiting to be admitted</h2>
           <p>The host will let you in shortly.</p>
           <code className={styles.waitRoom}>{roomId}</code>
-          <button className={styles.waitLeave} onClick={() => navigate("/")}>
+          <button
+            className={styles.waitLeave}
+            onClick={() => {
+              socketRef.current?.emit("cancel-knock", { roomId, userId });
+              setKnockStatus(null);
+              navigate("/");
+            }}
+          >
             Cancel
           </button>
         </div>
@@ -850,14 +864,48 @@ export default function Room() {
         </div>
       )}
 
-      {meshCapExceeded && (
-        <div className={styles.reconnectOverlay} style={{ pointerEvents: "none", background: "transparent" }}>
-          <div className={styles.reconnectCard} style={{ marginTop: 72 }}>
-            <p>
-              Mesh peer limit (~{meshSoftCap}) reached. Video quality may degrade;
-              large rooms will use SFU when enabled.
-            </p>
-          </div>
+      {meshCapExceeded && !meshCapDismissed && (
+        <div
+          style={{
+            position: "absolute",
+            top: 56,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 40,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            maxWidth: "min(520px, 92vw)",
+            padding: "8px 12px",
+            borderRadius: 10,
+            background: "rgba(15,23,42,.92)",
+            border: "1px solid rgba(251,191,36,.35)",
+            color: "#fde68a",
+            fontSize: 13,
+            boxShadow: "0 8px 24px rgba(0,0,0,.35)",
+          }}
+          role="status"
+        >
+          <span style={{ flex: 1 }}>
+            {isHost
+              ? `Mesh soft-cap (~${meshSoftCap} peers) reached — ask fewer people to enable video, or wait for SFU.`
+              : `Room is near mesh capacity (~${meshSoftCap}). Video may degrade.`}
+          </span>
+          <button
+            type="button"
+            onClick={() => setMeshCapDismissed(true)}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#fde68a",
+              cursor: "pointer",
+              fontSize: 16,
+              lineHeight: 1,
+            }}
+            aria-label="Dismiss mesh capacity warning"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -950,6 +998,9 @@ export default function Room() {
       {/* Knock requests (host) */}
       {isHost && knockRequests.length > 0 && (
         <div className={styles.knockPanel}>
+          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>
+            {knockRequests.length} waiting
+          </div>
           {knockRequests.map((k) => (
             <div key={k.socketId} className={styles.knockItem}>
               <span>

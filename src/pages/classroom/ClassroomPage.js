@@ -226,19 +226,43 @@ function StreamTab({classroomId,posts,setPosts,fetchPosts,isTeacher,userId,userN
   const[files,setFiles]=useState([]);
   const[posting,setPosting]=useState(false);
   const[scheduleDate,setScheduleDate]=useState('');
+  const[scheduled,setScheduled]=useState([]);
   const[comments,setComments]=useState({});
   const[commentInput,setCommentInput]=useState({});
   const[expanded,setExpanded]=useState({});
   const students=classroom?.members?.filter(m=>m.role==='student')||[];
   const upcoming=posts.filter(p=>p.type==='assignment'&&p.dueDate&&!isOverdue(p.dueDate)).sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate)).slice(0,5);
+  const loadScheduled=useCallback(async()=>{
+    if(!isTeacher) return;
+    try{
+      const r=await fetch(`${API}/api/classrooms/${classroomId}/scheduled`);
+      const d=await r.json();
+      setScheduled(Array.isArray(d)?d:[]);
+    }catch{setScheduled([]);}
+  },[classroomId,isTeacher]);
+  useEffect(()=>{loadScheduled();},[loadScheduled]);
   const handlePost=async()=>{
     if(!body.trim()&&!title.trim()) return;
     setPosting(true);
     try{
       const attachments=await uploadFilesToBlob(classroomId,files);
-      const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,body,authorId:userId,authorName:userName,title:title||undefined,scheduledFor:scheduleDate||undefined,attachments})});
-      const d=await r.json();setPosts(p=>[d,...p]);setCompose(false);setBody('');setTitle('');setFiles([]);setScheduleDate('');showToast('Posted!');
+      if(scheduleDate){
+        const r=await fetch(`${API}/api/classrooms/${classroomId}/scheduled`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,body,title:title||undefined,scheduledFor:new Date(scheduleDate).toISOString(),attachments})});
+        if(!r.ok) throw new Error('schedule failed');
+        await loadScheduled();
+        setCompose(false);setBody('');setTitle('');setFiles([]);setScheduleDate('');
+        showToast('Scheduled!');
+      }else{
+        const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,body,authorId:userId,authorName:userName,title:title||undefined,attachments})});
+        const d=await r.json();setPosts(p=>[d,...p]);setCompose(false);setBody('');setTitle('');setFiles([]);setScheduleDate('');showToast('Posted!');
+      }
     }catch{}finally{setPosting(false);}
+  };
+  const cancelScheduled=async(id)=>{
+    if(!window.confirm('Cancel this scheduled post?')) return;
+    await fetch(`${API}/api/classrooms/${classroomId}/scheduled/${id}`,{method:'DELETE'});
+    setScheduled(s=>s.filter(x=>x._id!==id));
+    showToast('Schedule cancelled');
   };
   const handlePin=async(postId,pinned)=>{
     await fetch(`${API}/api/classrooms/${classroomId}/posts/${postId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({pinned:!pinned})});
@@ -295,12 +319,27 @@ function StreamTab({classroomId,posts,setPosts,fetchPosts,isTeacher,userId,userN
                 </div>}
                 <div className={styles.formActions}>
                   <button className={styles.cancelBtn} onClick={()=>setCompose(false)}>Cancel</button>
-                  <button className={styles.submitBtn} style={{background:th.accent,color:'#000'}} onClick={handlePost} disabled={posting||(!body.trim()&&!title.trim())}>{posting?'Posting…':'Post'}</button>
+                  <button className={styles.submitBtn} style={{background:th.accent,color:'#000'}} onClick={handlePost} disabled={posting||(!body.trim()&&!title.trim())}>{posting?'Posting…':scheduleDate?'Schedule':'Post'}</button>
                 </div>
               </div>
             </>
           )}
         </div>
+        {isTeacher&&scheduled.length>0&&(
+          <div className={styles.postCard} style={{borderStyle:'dashed'}}>
+            <div className={styles.sectionLabel} style={{marginBottom:8}}>🕐 Upcoming scheduled ({scheduled.length})</div>
+            {scheduled.map(sp=>(
+              <div key={sp._id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:'1px solid var(--border, rgba(255,255,255,.06))'}}>
+                <span className={`${styles.postTypePill} ${styles[`pill_${sp.type}`]||''}`}>{sp.type}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{sp.title||sp.body||'Post'}</div>
+                  <div style={{fontSize:11,color:'var(--text-3)'}}>{fmtDate(sp.scheduledFor)} {fmtTime(sp.scheduledFor)}</div>
+                </div>
+                <button className={styles.deleteIconBtn} title="Cancel schedule" onClick={()=>cancelScheduled(sp._id)}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
         {/* Posts */}
         {sorted.length===0&&<div className={styles.emptyState}><span>📢</span><strong>No posts yet</strong><p>{isTeacher?'Start the conversation — share an announcement.':'Your teacher hasn\'t posted anything yet.'}</p></div>}
         {sorted.map(post=>{
@@ -384,7 +423,7 @@ function StreamTab({classroomId,posts,setPosts,fetchPosts,isTeacher,userId,userN
 // ══════════════════════════════════════════════════════════════════════════════
 function AssignmentsTab({classroomId,posts,setPosts,fetchPosts,isTeacher,userId,userName,th,classroom,showToast}){
   const[creating,setCreating]=useState(false);
-  const[form,setForm]=useState({title:'',body:'',dueDate:'',points:'',topic:''});
+  const[form,setForm]=useState({title:'',body:'',dueDate:'',points:'',topic:'',allowLateSubmissions:true});
   const[files,setFiles]=useState([]);
   const[posting,setPosting]=useState(false);
   const[selected,setSelected]=useState(null);
@@ -404,8 +443,8 @@ function AssignmentsTab({classroomId,posts,setPosts,fetchPosts,isTeacher,userId,
     if(!form.title.trim()) return;setPosting(true);
     try{
       const attachments=await uploadFilesToBlob(classroomId,files);
-      const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...form,type:'assignment',authorId:userId,authorName:userName,attachments})});
-      const d=await r.json();setPosts(p=>[d,...p]);setCreating(false);setForm({title:'',body:'',dueDate:'',points:'',topic:''});setFiles([]);showToast('Assignment created!');
+      const r=await fetch(`${API}/api/classrooms/${classroomId}/posts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...form,type:'assignment',authorId:userId,authorName:userName,attachments,allowLateSubmissions:form.allowLateSubmissions!==false})});
+      const d=await r.json();setPosts(p=>[d,...p]);setCreating(false);setForm({title:'',body:'',dueDate:'',points:'',topic:'',allowLateSubmissions:true});setFiles([]);showToast('Assignment created!');
     }catch{}finally{setPosting(false);}
   };
   const handleDelete=async(postId)=>{if(!window.confirm('Delete?')) return;await fetch(`${API}/api/classrooms/${classroomId}/posts/${postId}`,{method:'DELETE'});setPosts(p=>p.filter(x=>x.postId!==postId));showToast('Deleted');};
@@ -428,6 +467,10 @@ function AssignmentsTab({classroomId,posts,setPosts,fetchPosts,isTeacher,userId,
             <div className={styles.formGroup}><label className={styles.formLabel}>Points</label><input className={styles.formInput} type="number" placeholder="100" value={form.points} onChange={e=>setForm(f(({points:e.target.value})))}/></div>
             <div className={styles.formGroup}><label className={styles.formLabel}>Topic / Unit</label><input className={styles.formInput} placeholder="e.g. Chapter 3" value={form.topic} onChange={e=>setForm(f(({topic:e.target.value})))}/></div>
           </div>
+          <label style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:13,cursor:'pointer'}}>
+            <input type="checkbox" checked={!!form.allowLateSubmissions} onChange={e=>setForm(f(({allowLateSubmissions:e.target.checked})))}/>
+            Allow late submissions after due date
+          </label>
           <div style={{marginTop:10}}><FileDrop files={files} setFiles={setFiles} label="Attach reference files for students"/></div>
           <div className={styles.formActions}><button className={styles.cancelBtn} onClick={()=>{setCreating(false);setFiles([])}}>Cancel</button><button className={styles.submitBtn} style={{background:th.accent,color:'#000'}} onClick={handleCreate} disabled={posting||!form.title.trim()}>{posting?'Creating…':'Create Assignment'}</button></div>
         </div>
@@ -590,13 +633,21 @@ function AssignmentReviewPanel({classroomId,post,isTeacher,userId,userName,th,on
           ):(
             <div className={styles.submitForm}>
               <h4>{mySub?'Resubmit Work':'📤 Turn In'}</h4>
-              {isOverdue(post.dueDate)&&<div style={{padding:'8px 12px',background:'rgba(255,74,94,.08)',border:'1px solid rgba(255,74,94,.2)',borderRadius:8,fontSize:12,color:'var(--red)',marginBottom:12}}>⚠️ This assignment is past due — your submission will be marked late.</div>}
+              {isOverdue(post.dueDate)&&post.allowLateSubmissions===false?(
+                <div style={{padding:'8px 12px',background:'rgba(255,74,94,.08)',border:'1px solid rgba(255,74,94,.2)',borderRadius:8,fontSize:12,color:'var(--red)',marginBottom:12}}>⛔ Late submissions are closed for this assignment.</div>
+              ):isOverdue(post.dueDate)?(
+                <div style={{padding:'8px 12px',background:'rgba(255,74,94,.08)',border:'1px solid rgba(255,74,94,.2)',borderRadius:8,fontSize:12,color:'var(--red)',marginBottom:12}}>⚠️ This assignment is past due — your submission will be marked late.</div>
+              ):null}
+              {!(isOverdue(post.dueDate)&&post.allowLateSubmissions===false)&&(
+              <>
               <textarea className={styles.formTextarea} rows={3} placeholder="Add a note to your teacher…" value={myComment} onChange={e=>setMyComment(e.target.value)}/>
               <div style={{marginTop:10}}><FileDrop files={myFiles} setFiles={setMyFiles} label="Attach your work — multiple files supported"/></div>
               <div className={styles.formActions}>
                 {resubmit&&<button className={styles.cancelBtn} onClick={()=>setResubmit(false)}>Cancel</button>}
                 <button className={styles.submitBtn} style={{background:th.accent,color:'#000',minWidth:120}} onClick={handleSubmit} disabled={submitting||(!myComment.trim()&&myFiles.length===0)}>{submitting?'Turning in…':'Turn In ✓'}</button>
               </div>
+              </>
+              )}
             </div>
           )}
         </div>

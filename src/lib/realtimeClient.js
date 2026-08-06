@@ -305,6 +305,25 @@ export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
     heartbeatTimer = setInterval(beat, HEARTBEAT_MS);
   };
 
+  // Leave presence on tab close / navigate away (multi-tab safe via connectionId)
+  if (typeof window !== "undefined" && roomId) {
+    const onPageHide = () => {
+      if (!hasEnteredPresence) return;
+      const body = JSON.stringify({ userId, userName, connectionId });
+      try {
+        fetch(`${API}/api/rooms/${roomId}/presence`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body,
+          keepalive: true,
+        }).catch(() => {});
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("pagehide", onPageHide);
+  }
+
   const enterPresenceAndHydrate = async () => {
     const result = await postJSON(`/api/rooms/${roomId}/presence`, {
       userId,
@@ -372,6 +391,11 @@ export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
         await postJSON(`/api/rooms/${roomId}/knock`, {
           userId: data.userId,
           userName: data.userName,
+        }).catch(() => {});
+        return;
+      case "cancel-knock":
+        await delJSON(`/api/rooms/${roomId}/knock`, {
+          userId: data.userId || userId,
         }).catch(() => {});
         return;
 
