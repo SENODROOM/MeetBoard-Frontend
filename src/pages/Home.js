@@ -69,6 +69,9 @@ export default function Home() {
       setCreatedData(data);
       localStorage.setItem('qm_userName', userName);
       localStorage.setItem(`qm_host_${data.roomId}`, '1');
+      if (data.hostToken) {
+        localStorage.setItem(`qm_room_token_${data.roomId}`, data.hostToken);
+      }
     } catch { setError('Failed to create room. Is the server running?'); }
     finally { setLoading(false); }
   };

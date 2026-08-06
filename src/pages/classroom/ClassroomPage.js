@@ -115,9 +115,11 @@ export default function ClassroomPage(){
   const fetchSessions=useCallback(async()=>{try{const r=await fetch(`${API}/api/classrooms/${classroomId}/sessions`);const d=await r.json();setSessions(Array.isArray(d)?d:[]);}catch{}},[classroomId]);
   useEffect(()=>{Promise.all([fetchClassroom(),fetchPosts(),fetchSessions()]).finally(()=>setLoading(false));},[]);
   const startSession=async()=>{
-    const roomId=`cls-${classroomId.slice(0,8)}-${Date.now().toString(36)}`;
     try{
-      await fetch(`${API}/api/rooms`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,hostName:userName,isPublic:false,title:`${classroom?.name} – Live`})});
+      const res=await fetch(`${API}/api/rooms`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,hostName:userName,isPublic:false,title:`${classroom?.name} – Live`,classroomId,accountUserId:userId})});
+      const data=await res.json();
+      const roomId=data.roomId;
+      if(data.hostToken) localStorage.setItem(`qm_room_token_${roomId}`,data.hostToken);
       await fetch(`${API}/api/classrooms/${classroomId}/sessions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId,hostName:userName,classroomId})});
       localStorage.setItem(`qm_host_${roomId}`,'1');navigate(`/room/${roomId}?classroom=${classroomId}`);
     }catch(e){console.error(e);}

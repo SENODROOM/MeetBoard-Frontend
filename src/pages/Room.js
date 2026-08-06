@@ -199,7 +199,12 @@ export default function Room() {
   // ── Socket init ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!nameConfirmed) return;
-    const s = createRealtimeClient({ roomId, userId, userName });
+    const s = createRealtimeClient({
+      roomId,
+      userId,
+      userName,
+      roomToken: localStorage.getItem(`qm_room_token_${roomId}`) || undefined,
+    });
     socketRef.current = s;
     setSocket(s);
 
@@ -368,6 +373,8 @@ export default function Room() {
     screenStream,
     peers,
     peerQuality, // Feature 9
+    meshCapExceeded,
+    meshSoftCap,
     audioEnabled,
     videoEnabled,
     screenSharing,
@@ -839,6 +846,17 @@ export default function Room() {
           <div className={styles.reconnectCard}>
             <div className={styles.reconnectSpinner} />
             <p>Reconnecting to meeting…</p>
+          </div>
+        </div>
+      )}
+
+      {meshCapExceeded && (
+        <div className={styles.reconnectOverlay} style={{ pointerEvents: "none", background: "transparent" }}>
+          <div className={styles.reconnectCard} style={{ marginTop: 72 }}>
+            <p>
+              Mesh peer limit (~{meshSoftCap}) reached. Video quality may degrade;
+              large rooms will use SFU when enabled.
+            </p>
           </div>
         </div>
       )}

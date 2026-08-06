@@ -7,8 +7,17 @@ const API = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
 // socket-shaped API (`emit` / `on` / `off` / `id` / `disconnect`) so Room and
 // useWebRTC don't need to change. Peer addressing uses userId as socketId.
 
-const POLL_MS = 500;
+const POLL_MS_IDLE = 2000;
+const POLL_MS_ACTIVE = 400;
+const POLL_MS_NEGOTIATING = 250;
 const HEARTBEAT_MS = 8_000;
+const LONG_POLL_WAIT_MS = 20000;
+
+const SIGNALING_EVENTS = new Set([
+  "offer",
+  "answer",
+  "ice-candidate",
+]);
 
 const RELAY_RENAME = {
   "toggle-audio": (d, selfId) => [
@@ -81,7 +90,7 @@ async function getJSON(url) {
   return res.ok ? res.json().catch(() => null) : null;
 }
 
-export function createRealtimeClient({ roomId, userId, userName }) {
+export function createRealtimeClient({ roomId, userId, userName, roomToken }) {
   const listeners = new Map();
   const connectionId = uuidv4();
   let hasEnteredPresence = false;
@@ -93,8 +102,33 @@ export function createRealtimeClient({ roomId, userId, userName }) {
   let cursorTimer = null;
   let pendingCursor = null;
   let polling = false;
+  let negotiatingUntil = 0;
+  let lastActivity = Date.now();
+  let useLongPoll = true;
+  let token = roomToken || (roomId ? localStorage.getItem(`qm_room_token_${roomId}`) : null);
+
+  const setRoomToken = (t) => {
+    token = t;
+    if (roomId && t) localStorage.setItem(`qm_room_token_${roomId}`, t);
+  };
+
+  const withToken = (body) => ({ ...(body || {}), roomToken: token || undefined });
+
+  const markActivity = (event) => {
+    lastActivity = Date.now();
+    if (SIGNALING_EVENTS.has(event)) {
+      negotiatingUntil = Date.now() + 8000;
+    }
+  };
+
+  const currentPollMs = () => {
+    if (Date.now() < negotiatingUntil) return POLL_MS_NEGOTIATING;
+    if (Date.now() - lastActivity < 5000) return POLL_MS_ACTIVE;
+    return POLL_MS_IDLE;
+  };
 
   const dispatch = (event, data) => {
+    markActivity(event);
     listeners.get(event)?.forEach((fn) => {
       try {
         fn(data);
@@ -106,6 +140,7 @@ export function createRealtimeClient({ roomId, userId, userName }) {
 
   const publishEvent = async (event, payload) => {
     if (!roomId || closed) return;
+    markActivity(event);
     await postJSON(`/api/rooms/${roomId}/events`, {
       event,
       payload: payload || {},
@@ -136,15 +171,13 @@ export function createRealtimeClient({ roomId, userId, userName }) {
     try {
       if (roomId) {
         const q = new URLSearchParams({ userId, since: roomSince });
+        if (useLongPoll) q.set("wait", String(LONG_POLL_WAIT_MS));
         const data = await getJSON(`/api/rooms/${roomId}/events?${q}`);
         if (data?.events?.length) {
           for (const ev of data.events) {
             dispatch(ev.event, ev.payload);
             if (ev.createdAt > roomSince) roomSince = ev.createdAt;
           }
-        }
-        if (data?.serverTime && data.serverTime > roomSince) {
-          // keep since as last event time; serverTime alone shouldn't skip events
         }
       } else {
         const q = new URLSearchParams({ userId, since: secretSince });
@@ -157,16 +190,24 @@ export function createRealtimeClient({ roomId, userId, userName }) {
         }
       }
     } catch (e) {
-      // transient — next tick retries
+      useLongPoll = false; // fall back to short poll on transport errors
     } finally {
       polling = false;
     }
   };
 
+  const scheduleNextPoll = () => {
+    if (closed) return;
+    const delay = useLongPoll && roomId ? 50 : currentPollMs();
+    pollTimer = setTimeout(async () => {
+      await pollOnce();
+      scheduleNextPoll();
+    }, delay);
+  };
+
   const startPolling = () => {
     if (pollTimer) return;
-    pollTimer = setInterval(pollOnce, POLL_MS);
-    pollOnce();
+    scheduleNextPoll();
   };
 
   const startHeartbeat = () => {
@@ -201,18 +242,33 @@ export function createRealtimeClient({ roomId, userId, userName }) {
     dispatch("existing-peers", peers);
 
     const room = await getJSON(`/api/rooms/${roomId}`);
-    if (room?.host === userId) {
-      dispatch("host-status-confirmed", { isHost: true });
-      const knocks = await getJSON(
-        `/api/rooms/${roomId}/knocks?userId=${userId}`,
-      );
-      (knocks || []).forEach((k) =>
-        dispatch("knock-request", {
-          socketId: k.userId,
-          userId: k.userId,
-          userName: k.userName,
-        }),
-      );
+    let hostConfirmed = false;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        hostConfirmed =
+          payload.role === "host" &&
+          payload.roomId === roomId &&
+          payload.userId === userId;
+      } catch {}
+    }
+    if (hostConfirmed || room?.host === userId) {
+      if (!hostConfirmed && room?.host === userId) {
+        // Legacy: creator without token cannot elevate; only confirm UI if token present
+      }
+      if (hostConfirmed) {
+        dispatch("host-status-confirmed", { isHost: true });
+        const knocks = await getJSON(
+          `/api/rooms/${roomId}/knocks?userId=${encodeURIComponent(userId)}&roomToken=${encodeURIComponent(token)}`,
+        );
+        (knocks || []).forEach((k) =>
+          dispatch("knock-request", {
+            socketId: k.userId,
+            userId: k.userId,
+            userName: k.userName,
+          }),
+        );
+      }
     }
 
     const history = await getJSON(`/api/rooms/${roomId}/chat`);
@@ -237,66 +293,81 @@ export function createRealtimeClient({ roomId, userId, userName }) {
         return;
 
       case "admit-user":
-        await postJSON(`/api/rooms/${roomId}/admit`, {
-          userId,
-          targetUserId: data.socketId,
-        }).catch(() => {});
+        await postJSON(
+          `/api/rooms/${roomId}/admit`,
+          withToken({ userId, targetUserId: data.socketId }),
+        ).catch(() => {});
         return;
       case "reject-user":
-        await postJSON(`/api/rooms/${roomId}/reject`, {
-          userId,
-          targetUserId: data.socketId,
-        }).catch(() => {});
+        await postJSON(
+          `/api/rooms/${roomId}/reject`,
+          withToken({ userId, targetUserId: data.socketId }),
+        ).catch(() => {});
         return;
       case "kick-user":
-        await postJSON(`/api/rooms/${roomId}/kick`, {
-          userId,
-          targetUserId: data.targetSocketId,
-        }).catch(() => {});
+        await postJSON(
+          `/api/rooms/${roomId}/kick`,
+          withToken({ userId, targetUserId: data.targetSocketId }),
+        ).catch(() => {});
         return;
 
       case "host-mute-user":
-        return postJSON(`/api/rooms/${roomId}/host-action`, {
-          userId,
-          action: "mute-user",
-          targetUserId: data.targetSocketId,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/host-action`,
+          withToken({
+            userId,
+            action: "mute-user",
+            targetUserId: data.targetSocketId,
+          }),
+        ).catch(() => {});
       case "host-unmute-user":
-        return postJSON(`/api/rooms/${roomId}/host-action`, {
-          userId,
-          action: "unmute-user",
-          targetUserId: data.targetSocketId,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/host-action`,
+          withToken({
+            userId,
+            action: "unmute-user",
+            targetUserId: data.targetSocketId,
+          }),
+        ).catch(() => {});
       case "host-mute-all":
-        return postJSON(`/api/rooms/${roomId}/host-action`, {
-          userId,
-          action: "mute-all",
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/host-action`,
+          withToken({ userId, action: "mute-all" }),
+        ).catch(() => {});
       case "host-stop-video":
-        return postJSON(`/api/rooms/${roomId}/host-action`, {
-          userId,
-          action: "stop-video",
-          targetUserId: data.targetSocketId,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/host-action`,
+          withToken({
+            userId,
+            action: "stop-video",
+            targetUserId: data.targetSocketId,
+          }),
+        ).catch(() => {});
       case "host-wb-permission":
-        return postJSON(`/api/rooms/${roomId}/host-action`, {
-          userId,
-          action: "wb-permission",
-          targetUserId: data.targetSocketId,
-          allowed: data.allowed,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/host-action`,
+          withToken({
+            userId,
+            action: "wb-permission",
+            targetUserId: data.targetSocketId,
+            allowed: data.allowed,
+          }),
+        ).catch(() => {});
       case "host-lower-all-hands":
-        return postJSON(`/api/rooms/${roomId}/host-action`, {
-          userId,
-          action: "lower-all-hands",
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/host-action`,
+          withToken({ userId, action: "lower-all-hands" }),
+        ).catch(() => {});
       case "host-grant-transcribe":
-        return postJSON(`/api/rooms/${roomId}/host-action`, {
-          userId,
-          action: "grant-transcribe",
-          targetUserId: data.targetSocketId,
-          allowed: data.allowed,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/host-action`,
+          withToken({
+            userId,
+            action: "grant-transcribe",
+            targetUserId: data.targetSocketId,
+            allowed: data.allowed,
+          }),
+        ).catch(() => {});
 
       case "chat-message":
         return postJSON(`/api/rooms/${roomId}/chat`, {
@@ -306,21 +377,25 @@ export function createRealtimeClient({ roomId, userId, userName }) {
         }).catch(() => {});
 
       case "poll-create":
-        return postJSON(`/api/rooms/${roomId}/polls`, {
-          userId,
-          question: data.question,
-          options: data.options,
-          createdBy: userName,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/polls`,
+          withToken({
+            userId,
+            question: data.question,
+            options: data.options,
+            createdBy: userName,
+          }),
+        ).catch(() => {});
       case "poll-vote":
         return postJSON(`/api/rooms/${roomId}/polls/${data.pollId}/vote`, {
           userId: data.userId,
           optionIndex: data.optionIndex,
         }).catch(() => {});
       case "poll-end":
-        return postJSON(`/api/rooms/${roomId}/polls/${data.pollId}/end`, {
-          userId,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/polls/${data.pollId}/end`,
+          withToken({ userId }),
+        ).catch(() => {});
       case "poll-get-all": {
         const polls = await getJSON(`/api/rooms/${roomId}/polls`);
         dispatch("poll-all", polls || []);
@@ -341,16 +416,18 @@ export function createRealtimeClient({ roomId, userId, userName }) {
       case "qna-mark-answered":
         return patchJSON(
           `/api/rooms/${roomId}/qna/${data.questionId}/answered`,
-          { userId },
+          withToken({ userId }),
         ).catch(() => {});
       case "qna-pin":
-        return patchJSON(`/api/rooms/${roomId}/qna/${data.questionId}/pin`, {
-          userId,
-        }).catch(() => {});
+        return patchJSON(
+          `/api/rooms/${roomId}/qna/${data.questionId}/pin`,
+          withToken({ userId }),
+        ).catch(() => {});
       case "qna-dismiss":
-        return delJSON(`/api/rooms/${roomId}/qna/${data.questionId}`, {
-          userId,
-        }).catch(() => {});
+        return delJSON(
+          `/api/rooms/${roomId}/qna/${data.questionId}`,
+          withToken({ userId }),
+        ).catch(() => {});
       case "qna-get-all": {
         const qs = await getJSON(`/api/rooms/${roomId}/qna`);
         dispatch("qna-all", qs || []);
@@ -358,29 +435,34 @@ export function createRealtimeClient({ roomId, userId, userName }) {
       }
 
       case "breakout-create":
-        return postJSON(`/api/rooms/${roomId}/breakout`, {
-          userId,
-          breakoutRooms: data.breakoutRooms,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/breakout`,
+          withToken({ userId, breakoutRooms: data.breakoutRooms }),
+        ).catch(() => {});
       case "breakout-assign":
-        return postJSON(`/api/rooms/${roomId}/breakout/assign`, {
-          userId,
-          targetUserId: data.targetSocketId,
-          breakoutRoomId: data.breakoutRoomId,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/breakout/assign`,
+          withToken({
+            userId,
+            targetUserId: data.targetSocketId,
+            breakoutRoomId: data.breakoutRoomId,
+          }),
+        ).catch(() => {});
       case "breakout-end":
-        return delJSON(`/api/rooms/${roomId}/breakout`, { userId }).catch(
-          () => {},
-        );
+        return delJSON(
+          `/api/rooms/${roomId}/breakout`,
+          withToken({ userId }),
+        ).catch(() => {});
       case "breakout-broadcast":
-        return postJSON(`/api/rooms/${roomId}/breakout/broadcast`, {
-          userId,
-          message: data.message,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/breakout/broadcast`,
+          withToken({ userId, message: data.message }),
+        ).catch(() => {});
       case "breakout-call-back":
-        return postJSON(`/api/rooms/${roomId}/breakout/callback`, {
-          userId,
-        }).catch(() => {});
+        return postJSON(
+          `/api/rooms/${roomId}/breakout/callback`,
+          withToken({ userId }),
+        ).catch(() => {});
       case "breakout-get": {
         const state = await getJSON(`/api/rooms/${roomId}/breakout`);
         dispatch("breakout-state", state || null);
@@ -442,7 +524,7 @@ export function createRealtimeClient({ roomId, userId, userName }) {
     },
     disconnect() {
       closed = true;
-      if (pollTimer) clearInterval(pollTimer);
+      if (pollTimer) clearTimeout(pollTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (cursorTimer) clearTimeout(cursorTimer);
       pollTimer = heartbeatTimer = cursorTimer = null;
@@ -454,6 +536,7 @@ export function createRealtimeClient({ roomId, userId, userName }) {
         }).catch(() => {});
       }
     },
+    setRoomToken,
   };
 
   // Room clients poll immediately; SecretMeet (no roomId) starts on queue join
